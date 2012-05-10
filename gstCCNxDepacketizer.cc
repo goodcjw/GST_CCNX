@@ -20,19 +20,19 @@
 #include "gstCCNxDepacketizer.h"
 
 static void gst_ccnx_depkt_set_window (
-    GstCCNxSegmenter *object, unsigned int window);
-static void gst_ccnx_depkt_fetch_stream_info (GstCCNxSegmenter *object);
-static void gst_ccnx_depkt_fetch_start_time (GstCCNxSegmenter *object);
-static const char* gst_ccnx_depkt_getcaps (GstCCNxSegmenter *object);
-static void gst_ccnx_depkt_finish_ccnx_loop (GstCCNxSegmenter *object);
-static void gst_ccnx_depkt_seek (GstCCNxSegmenter *object);
+    GstCCNxDepacketizer *object, unsigned int window);
+static void gst_ccnx_depkt_fetch_stream_info (GstCCNxDepacketizer *object);
+static void gst_ccnx_depkt_fetch_start_time (GstCCNxDepacketizer *object);
+
+static void gst_ccnx_depkt_finish_ccnx_loop (GstCCNxDepacketizer *object);
+static void gst_ccnx_depkt_seek (GstCCNxDepacketizer *object);
 // TODO 
 // static void gst_ccnx_depkt_check_duration(interest);
-// static void gst_ccnx_depkt_check_duration_initial(GstCCNxSegmenter *object);
+// static void gst_ccnx_depkt_check_duration_initial(GstCCNxDepacketizer *object);
 
 // Bellow methods are called by thread
-static void gst_ccnx_depkt_run (GstCCNxSegmenter *object);
-static void gst_ccnx_depkt_process_cmds (GstCCNxSegmenter *object);
+static void gst_ccnx_depkt_run (GstCCNxDepacketizer *object);
+static void gst_ccnx_depkt_process_cmds (GstCCNxDepacketizer *object);
 // def fetch_seek_query(self, ns):
 // def duration_process_result(self, kind, info):
 static enum ccn_upcall_res gst_ccnx_depkt_duration_result (
@@ -43,11 +43,11 @@ static enum ccn_upcall_res gst_ccnx_depkt_duration_result (
 // def check_duration(self):
 
 static gboolean
-gst_ccnx_depkt_express_interest (GstCCNxSegmenter *object, const char* seg);
+gst_ccnx_depkt_express_interest (GstCCNxDepacketizer *object, const char* seg);
 
-static void gst_ccnx_depkt_process_response (GstCCNxSegmenter *object);
+static void gst_ccnx_depkt_process_response (GstCCNxDepacketizer *object);
 static void gst_ccnx_depkt_push_data (
-    GstCCNxSegmenter *object, const char* buf);
+    GstCCNxDepacketizer *object, const char* buf);
 
 static enum ccn_upcall_res gst_ccnx_depkt_upcall (
     struct ccn_closure *selfp,
@@ -58,58 +58,62 @@ static enum ccn_upcall_res gst_ccnx_depkt_upcall (
 static void gst_ccnx_depkt_num2seg (guint64 num, struct ccn_charbuf* seg);
 
 static void
-gst_ccnx_depkt_set_window (GstCCNxSegmenter *object, unsigned int window)
+gst_ccnx_depkt_set_window (GstCCNxDepacketizer *object, unsigned int window)
 {
 }
 
 static void
-gst_ccnx_depkt_fetch_stream_info (GstCCNxSegmenter *object)
+gst_ccnx_depkt_fetch_stream_info (GstCCNxDepacketizer *object)
 {
 }
 
 static void
-gst_ccnx_depkt_fetch_start_time (GstCCNxSegmenter *object)
+gst_ccnx_depkt_fetch_start_time (GstCCNxDepacketizer *object)
 {
 }
 
-static const char*
-gst_ccnx_depkt_getcaps (GstCCNxSegmenter *object)
+GstCaps*
+gst_ccnx_depkt_get_caps (GstCCNxDepacketizer *object)
 {
   // TODO
   return NULL;
 }
 
 static void
-gst_ccnx_depkt_finish_ccnx_loop (GstCCNxSegmenter *object)
+gst_ccnx_depkt_finish_ccnx_loop (GstCCNxDepacketizer *object)
 {
 }
 
 static void
-gst_ccnx_depkt_seek (GstCCNxSegmenter *object)
+gst_ccnx_depkt_seek (GstCCNxDepacketizer *object)
 {
 }
 
 gboolean
-gst_ccnx_depkt_start (GstCCNxSegmenter *object)
+gst_ccnx_depkt_start (GstCCNxDepacketizer *object)
 {
+  if (object == NULL)
+    return FALSE;
   // TODO
   return FALSE;
 }
 
 gboolean
-gst_ccnx_depkt_stop (GstCCNxSegmenter *object)
+gst_ccnx_depkt_stop (GstCCNxDepacketizer *object)
 {
+  if (object == NULL)
+    return FALSE;
   // TODO
   return FALSE;
 }
 
 static void
-gst_ccnx_depkt_run (GstCCNxSegmenter *object)
+gst_ccnx_depkt_run (GstCCNxDepacketizer *object)
 {
 }
 
 static void
-gst_ccnx_depkt_process_cmds (GstCCNxSegmenter *object)
+gst_ccnx_depkt_process_cmds (GstCCNxDepacketizer *object)
 {
 }
 
@@ -124,7 +128,7 @@ gst_ccnx_depkt_duration_result (
 }
 
 static gboolean
-gst_ccnx_depkt_express_interest (GstCCNxSegmenter *object, const char* seg)
+gst_ccnx_depkt_express_interest (GstCCNxDepacketizer *object, const char* seg)
 {
   // TODO
   // mNameSegments
@@ -132,12 +136,12 @@ gst_ccnx_depkt_express_interest (GstCCNxSegmenter *object, const char* seg)
 }
 
 static void
-gst_ccnx_depkt_process_response (GstCCNxSegmenter *object)
+gst_ccnx_depkt_process_response (GstCCNxDepacketizer *object)
 {
 }
 
 static void
-gst_ccnx_depkt_push_data (GstCCNxSegmenter *object, const char* buf)
+gst_ccnx_depkt_push_data (GstCCNxDepacketizer *object, const char* buf)
 {
 }
 

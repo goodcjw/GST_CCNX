@@ -82,6 +82,7 @@ static void gst_ccnx_src_set_property (GObject * object, guint prop_id,
 static void gst_ccnx_src_get_property (GObject * object, guint prop_id,
     GValue * value, GParamSpec * pspec);
 
+GstCaps* gst_ccnx_src_get_caps (GstBaseSrc* basesrc);
 static gboolean gst_ccnx_src_start (GstBaseSrc * basesrc);
 static gboolean gst_ccnx_src_stop (GstBaseSrc * basesrc);
 
@@ -126,6 +127,7 @@ gst_ccnx_src_class_init (GstCCNxSrcClass * klass)
 
   gobject_class->finalize = gst_ccnx_src_finalize;
 
+  gstbasesrc_class->get_caps = GST_DEBUG_FUNCPTR(gst_ccnx_src_get_caps);
   gstbasesrc_class->start = GST_DEBUG_FUNCPTR(gst_ccnx_src_start);
   gstbasesrc_class->stop = GST_DEBUG_FUNCPTR(gst_ccnx_src_stop);
   gstbasesrc_class->is_seekable = GST_DEBUG_FUNCPTR(gst_ccnx_src_is_seekable);
@@ -140,6 +142,7 @@ gst_ccnx_src_class_init (GstCCNxSrcClass * klass)
 static void
 gst_ccnx_src_init (GstCCNxSrc * src, GstCCNxSrcClass * gclass)
 {
+
   src->mName = NULL;
   src->mDepkt = NULL;
   /* TODO initialize the depacketizer */
@@ -220,7 +223,7 @@ gst_ccnx_src_get_property (GObject * object, guint prop_id,
 
   switch (prop_id) {
     case PROP_CCNX_NAME:
-      g_value_set_string(value, src->mName);
+      g_value_set_string (value, src->mName);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -228,16 +231,25 @@ gst_ccnx_src_get_property (GObject * object, guint prop_id,
   }
 }
 
-static gboolean
-gst_ccnx_src_start (GstBaseSrc * basesrc) {
-  /* TODO call depacketizer */
-  return FALSE;
+GstCaps* gst_ccnx_src_get_caps (GstBaseSrc* basesrc)
+{
+  GstCCNxSrc *src = GST_CCNX_SRC (basesrc);
+  if (src->mDepkt)
+    return gst_ccnx_depkt_get_caps (src->mDepkt);
 }
 
 static gboolean
-gst_ccnx_src_stop (GstBaseSrc * basesrc) {
-  /* TODO call depacketizer */
-  return FALSE;
+gst_ccnx_src_start (GstBaseSrc * basesrc)
+{
+  GstCCNxSrc *src = GST_CCNX_SRC (basesrc);
+  return gst_ccnx_depkt_start (src->mDepkt);
+}
+
+static gboolean
+gst_ccnx_src_stop (GstBaseSrc * basesrc)
+{
+  GstCCNxSrc *src = GST_CCNX_SRC (basesrc);
+  return gst_ccnx_depkt_stop (src->mDepkt);
 }
 
 static gboolean
@@ -249,13 +261,15 @@ gst_ccnx_src_is_seekable (GstBaseSrc * basesrc)
 
 static GstFlowReturn
 gst_ccnx_src_create (GstBaseSrc * basesrc, guint64 offset, guint length,
-                     GstBuffer ** buffer) {
+                     GstBuffer ** buffer)
+{
   /* TODO call depacketizer */
   return GST_FLOW_ERROR;
 }
 
 static gboolean
-gst_ccnx_src_query (GstBaseSrc * basesrc, GstQuery * query) {
+gst_ccnx_src_query (GstBaseSrc * basesrc, GstQuery * query)
+{
   /* TODO call depacketizer */
   return FALSE;
 }

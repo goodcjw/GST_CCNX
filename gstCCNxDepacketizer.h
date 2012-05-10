@@ -70,8 +70,9 @@ struct _GstCCNxDepacketizer {
   */
 };
 
-gboolean gst_ccnx_depkt_start(GstCCNxSegmenter *object);
-gboolean gst_ccnx_depkt_stop(GstCCNxSegmenter *object);
+gboolean gst_ccnx_depkt_start (GstCCNxDepacketizer *object);
+gboolean gst_ccnx_depkt_stop (GstCCNxDepacketizer *object);
+GstCaps* gst_ccnx_depkt_get_caps (GstCCNxDepacketizer *);
 
 /* test functions */
 guint64 test_pack_unpack (guint64 num);
