@@ -60,16 +60,19 @@ static void gst_ccnx_depkt_num2seg (guint64 num, struct ccn_charbuf* seg);
 static void
 gst_ccnx_depkt_set_window (GstCCNxDepacketizer *object, unsigned int window)
 {
+  // TODO
 }
 
 static void
 gst_ccnx_depkt_fetch_stream_info (GstCCNxDepacketizer *object)
 {
+  // TODO
 }
 
 static void
 gst_ccnx_depkt_fetch_start_time (GstCCNxDepacketizer *object)
 {
+  // TODO
 }
 
 GstCaps*
@@ -82,11 +85,13 @@ gst_ccnx_depkt_get_caps (GstCCNxDepacketizer *object)
 static void
 gst_ccnx_depkt_finish_ccnx_loop (GstCCNxDepacketizer *object)
 {
+  // TODO
 }
 
 static void
 gst_ccnx_depkt_seek (GstCCNxDepacketizer *object)
 {
+  // TODO
 }
 
 gboolean
@@ -110,11 +115,13 @@ gst_ccnx_depkt_stop (GstCCNxDepacketizer *object)
 static void
 gst_ccnx_depkt_run (GstCCNxDepacketizer *object)
 {
+  // TODO
 }
 
 static void
 gst_ccnx_depkt_process_cmds (GstCCNxDepacketizer *object)
 {
+  // TODO
 }
 
 static enum ccn_upcall_res
@@ -138,11 +145,13 @@ gst_ccnx_depkt_express_interest (GstCCNxDepacketizer *object, const char* seg)
 static void
 gst_ccnx_depkt_process_response (GstCCNxDepacketizer *object)
 {
+  // TODO
 }
 
 static void
 gst_ccnx_depkt_push_data (GstCCNxDepacketizer *object, const char* buf)
 {
+  // TODO
 }
 
 static enum ccn_upcall_res
