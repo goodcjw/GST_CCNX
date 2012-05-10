@@ -82,15 +82,18 @@ static void gst_ccnx_src_set_property (GObject * object, guint prop_id,
 static void gst_ccnx_src_get_property (GObject * object, guint prop_id,
     GValue * value, GParamSpec * pspec);
 
-GstCaps* gst_ccnx_src_get_caps (GstBaseSrc* basesrc);
+static GstCaps* gst_ccnx_src_get_caps (GstBaseSrc* basesrc);
 static gboolean gst_ccnx_src_start (GstBaseSrc * basesrc);
 static gboolean gst_ccnx_src_stop (GstBaseSrc * basesrc);
 
 static gboolean gst_ccnx_src_is_seekable (GstBaseSrc * src);
-//static gboolean gst_ccnx_src_get_size (GstBaseSrc * src, guint64 * size);
+static gboolean gst_ccnx_src_unlock (GstBaseSrc * src);
 static GstFlowReturn gst_ccnx_src_create (GstBaseSrc * src, guint64 offset,
                                           guint length, GstBuffer ** buffer);
 static gboolean gst_ccnx_src_query (GstBaseSrc * src, GstQuery * query);
+static gboolean gst_ccnx_src_do_seek (GstBaseSrc *src, GstSegment *segment);
+static gboolean gst_ccnx_src_check_get_range (GstBaseSrc *src);
+static gboolean gst_ccnx_src_unlock_stop (GstBaseSrc * src);
 
 static void
 gst_ccnx_src_base_init (gpointer gclass)
@@ -132,7 +135,12 @@ gst_ccnx_src_class_init (GstCCNxSrcClass * klass)
   gstbasesrc_class->stop = GST_DEBUG_FUNCPTR(gst_ccnx_src_stop);
   gstbasesrc_class->is_seekable = GST_DEBUG_FUNCPTR(gst_ccnx_src_is_seekable);
   gstbasesrc_class->create = GST_DEBUG_FUNCPTR(gst_ccnx_src_create);
+  gstbasesrc_class->do_seek = GST_DEBUG_FUNCPTR(gst_ccnx_src_do_seek);
   gstbasesrc_class->query = GST_DEBUG_FUNCPTR(gst_ccnx_src_query);
+  gstbasesrc_class->check_get_range = GST_DEBUG_FUNCPTR(
+      gst_ccnx_src_check_get_range);
+  gstbasesrc_class->unlock = GST_DEBUG_FUNCPTR(gst_ccnx_src_unlock);
+  gstbasesrc_class->unlock_stop = GST_DEBUG_FUNCPTR(gst_ccnx_src_unlock_stop);
 }
 
 /*
@@ -142,7 +150,6 @@ gst_ccnx_src_class_init (GstCCNxSrcClass * klass)
 static void
 gst_ccnx_src_init (GstCCNxSrc * src, GstCCNxSrcClass * gclass)
 {
-
   src->mName = NULL;
   src->mDepkt = NULL;
   /* TODO initialize the depacketizer */
@@ -231,7 +238,7 @@ gst_ccnx_src_get_property (GObject * object, guint prop_id,
   }
 }
 
-GstCaps* gst_ccnx_src_get_caps (GstBaseSrc* basesrc)
+static GstCaps* gst_ccnx_src_get_caps (GstBaseSrc* basesrc)
 {
   GstCCNxSrc *src = GST_CCNX_SRC (basesrc);
   if (src->mDepkt)
@@ -259,6 +266,13 @@ gst_ccnx_src_is_seekable (GstBaseSrc * basesrc)
   return TRUE;
 }
 
+static gboolean
+gst_ccnx_src_unlock (GstBaseSrc * src)
+{
+  /* TODO */
+  return FALSE;
+}
+
 static GstFlowReturn
 gst_ccnx_src_create (GstBaseSrc * basesrc, guint64 offset, guint length,
                      GstBuffer ** buffer)
@@ -271,6 +285,27 @@ static gboolean
 gst_ccnx_src_query (GstBaseSrc * basesrc, GstQuery * query)
 {
   /* TODO call depacketizer */
+  return FALSE;
+}
+
+static gboolean
+gst_ccnx_src_do_seek (GstBaseSrc *src, GstSegment *segment)
+{
+  /* TODO */
+  return FALSE;
+}
+
+static gboolean
+gst_ccnx_src_check_get_range (GstBaseSrc *src)
+{
+  /* TODO */
+  return FALSE;
+}
+
+static gboolean
+gst_ccnx_src_unlock_stop (GstBaseSrc * src)
+{
+  /* TODO */
   return FALSE;
 }
 
