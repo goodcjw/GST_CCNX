@@ -95,6 +95,8 @@ static gboolean gst_ccnx_src_do_seek (GstBaseSrc *src, GstSegment *segment);
 static gboolean gst_ccnx_src_check_get_range (GstBaseSrc *src);
 static gboolean gst_ccnx_src_unlock_stop (GstBaseSrc * src);
 
+static gboolean gst_ccnx_src_query_duration (GstBaseSrc * src);
+
 static void
 gst_ccnx_src_base_init (gpointer gclass)
 {
@@ -152,6 +154,7 @@ gst_ccnx_src_init (GstCCNxSrc * src, GstCCNxSrcClass * gclass)
 {
   src->mName = NULL;
   src->mDepkt = NULL;
+  src->mNoLocking = FALSE;
   /* TODO initialize the depacketizer */
 }
 
@@ -241,8 +244,11 @@ gst_ccnx_src_get_property (GObject * object, guint prop_id,
 static GstCaps* gst_ccnx_src_get_caps (GstBaseSrc* basesrc)
 {
   GstCCNxSrc *src = GST_CCNX_SRC (basesrc);
-  if (src->mDepkt)
-    return gst_ccnx_depkt_get_caps (src->mDepkt);
+  if (src->mDepkt == NULL)
+    return FALSE;
+
+  return gst_ccnx_depkt_get_caps (src->mDepkt);
+ 
 }
 
 static gboolean
@@ -262,15 +268,17 @@ gst_ccnx_src_stop (GstBaseSrc * basesrc)
 static gboolean
 gst_ccnx_src_is_seekable (GstBaseSrc * basesrc)
 {
-  /* TODO LOG */
   return TRUE;
 }
 
 static gboolean
-gst_ccnx_src_unlock (GstBaseSrc * src)
+gst_ccnx_src_unlock (GstBaseSrc * basesrc)
 {
-  /* TODO */
-  return FALSE;
+  GstCCNxSrc *src = GST_CCNX_SRC (basesrc);
+  if (src == NULL)
+    return FALSE;
+  src->mNoLocking = TRUE;
+  return TRUE;
 }
 
 static GstFlowReturn
@@ -285,14 +293,28 @@ static gboolean
 gst_ccnx_src_query (GstBaseSrc * basesrc, GstQuery * query)
 {
   /* TODO call depacketizer */
-  return FALSE;
+  if (basesrc == NULL || query == NULL)
+    return FALSE;
+
+  GstCCNxSrc *src = GST_CCNX_SRC (basesrc);
+
+  if (query->type != GST_QUERY_DURATION)
+    return ((GstBaseSrcClass *) parent_class)->query (src->mBase, query);
+
+  gint64 duration = src->mDepkt->mDurationNs;
+  gst_query_set_duration (query, GST_FORMAT_TIME, duration);
+
+  return TRUE;
 }
 
 static gboolean
-gst_ccnx_src_do_seek (GstBaseSrc *src, GstSegment *segment)
+gst_ccnx_src_do_seek (GstBaseSrc *basesrc, GstSegment *segment)
 {
-  /* TODO */
-  return FALSE;
+  GstCCNxSrc *src = GST_CCNX_SRC (basesrc);
+
+  src->mSeeking = segment->start;
+  gxg_ccnx_depkt_seek (src->mDepkt, segment->start);
+  return TRUE;
 }
 
 static gboolean
@@ -306,6 +328,15 @@ static gboolean
 gst_ccnx_src_unlock_stop (GstBaseSrc * src)
 {
   /* TODO */
+  return FALSE;
+}
+
+static gboolean
+gst_ccnx_src_query_duration (GstCCNxSrc * src)
+{
+  if (src->mDepkt)
+    return gst_ccnx_depkt_check_duration_initial(src->mDepkt);
+
   return FALSE;
 }
 

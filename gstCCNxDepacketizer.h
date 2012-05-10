@@ -32,14 +32,14 @@ typedef struct _GstCCNxDepacketizer GstCCNxDepacketizer;
 
 struct _GstCCNxDepacketizer {
   /* size of input window */
-  guint32                        mWindowSize;
+  gint32                         mWindowSize;
   /* in units of 1/4096 seconds */
-  guint32                        mInterestLifetime;
+  gint32                         mInterestLifetime;
   /* how many times to retry request */
-  guint32                        mInterestRetries; 
+  gint32                         mInterestRetries; 
   // TODO shall we have a queue inside gstCCNxSrc? for synchronization?
   /* duration of the stream (in nanoseconds) */
-  guint64                        mDurationNs;
+  gint64                         mDurationNs;
   gboolean                       mRunning;
   /* ? raw content of content data ? */
   const char                    *mCaps;
@@ -47,7 +47,7 @@ struct _GstCCNxDepacketizer {
   const struct ccn_charbuf      *mStartTime;  
   gboolean                       mSeekSegment;
   /* ??? */
-  guint64                        mDurationLast;
+  gint64                         mDurationLast;
   // TODO shall we have a queue for command?
 
   struct ccn                    *mCCNx;
@@ -59,8 +59,8 @@ struct _GstCCNxDepacketizer {
   GstCCNxSegmenter              *mSegmenter;
 
   /* self._stats = { 'srtt': 0.05, 'rttvar': 0.01 } */
-  guint32                        mStatsRetries;
-  guint32                        mStatsDrops;
+  gint32                         mStatsRetries;
+  gint32                         mStatsDrops;
   
   /* 
      self._tmp_retry_requests = {}
@@ -73,6 +73,9 @@ struct _GstCCNxDepacketizer {
 gboolean gst_ccnx_depkt_start (GstCCNxDepacketizer *object);
 gboolean gst_ccnx_depkt_stop (GstCCNxDepacketizer *object);
 GstCaps* gst_ccnx_depkt_get_caps (GstCCNxDepacketizer *);
+
+gboolean gst_ccnx_depkt_check_duration_initial (GstCCNxDepacketizer *object);
+void gst_ccnx_depkt_seek (GstCCNxDepacketizer *object, gint64 seg_start);
 
 /* test functions */
 guint64 test_pack_unpack (guint64 num);

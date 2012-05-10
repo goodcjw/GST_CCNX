@@ -25,10 +25,8 @@ static void gst_ccnx_depkt_fetch_stream_info (GstCCNxDepacketizer *object);
 static void gst_ccnx_depkt_fetch_start_time (GstCCNxDepacketizer *object);
 
 static void gst_ccnx_depkt_finish_ccnx_loop (GstCCNxDepacketizer *object);
-static void gst_ccnx_depkt_seek (GstCCNxDepacketizer *object);
 // TODO 
 // static void gst_ccnx_depkt_check_duration(interest);
-// static void gst_ccnx_depkt_check_duration_initial(GstCCNxDepacketizer *object);
 
 // Bellow methods are called by thread
 static void gst_ccnx_depkt_run (GstCCNxDepacketizer *object);
@@ -88,10 +86,19 @@ gst_ccnx_depkt_finish_ccnx_loop (GstCCNxDepacketizer *object)
   // TODO
 }
 
-static void
-gst_ccnx_depkt_seek (GstCCNxDepacketizer *object)
+void
+gst_ccnx_depkt_seek (GstCCNxDepacketizer *object, gint64 seg_start)
 {
   // TODO
+}
+
+gboolean
+gst_ccnx_depkt_check_duration_initial(GstCCNxDepacketizer *object)
+{
+  // TODO
+  if (object == NULL)
+    return FALSE;
+  return FALSE;
 }
 
 gboolean
