@@ -86,10 +86,10 @@ static GstCaps* gst_ccnx_src_get_caps (GstBaseSrc* basesrc);
 static gboolean gst_ccnx_src_start (GstBaseSrc * basesrc);
 static gboolean gst_ccnx_src_stop (GstBaseSrc * basesrc);
 
-static gboolean gst_ccnx_src_is_seekable (GstBaseSrc * src);
-static gboolean gst_ccnx_src_unlock (GstBaseSrc * src);
-static GstFlowReturn gst_ccnx_src_create (GstBaseSrc * src, guint64 offset,
-                                          guint length, GstBuffer ** buffer);
+static gboolean gst_ccnx_src_is_seekable (GstBaseSrc * basesrc);
+static gboolean gst_ccnx_src_unlock (GstBaseSrc * basesrc);
+static GstFlowReturn gst_ccnx_src_create (
+    GstBaseSrc * basesrc, guint64 offset, guint length, GstBuffer ** buffer);
 static gboolean gst_ccnx_src_query (GstBaseSrc * src, GstQuery * query);
 static gboolean gst_ccnx_src_do_seek (GstBaseSrc *src, GstSegment *segment);
 static gboolean gst_ccnx_src_check_get_range (GstBaseSrc *src);
@@ -155,19 +155,16 @@ gst_ccnx_src_init (GstCCNxSrc * src, GstCCNxSrcClass * gclass)
   src->mName = NULL;
   src->mDepkt = NULL;
   src->mNoLocking = FALSE;
-  /* TODO initialize the depacketizer */
 }
 
 static void
 gst_ccnx_src_finalize (GObject * object)
 {
-  /* TODO finialize the depacketizer */
   GstCCNxSrc *src;
-
   src = GST_CCNX_SRC (object);
 
   g_free (src->mName);
-  g_free (src->mDepkt);
+  gst_ccnx_src_destroy (&src->mDepkt);
 
   G_OBJECT_CLASS (parent_class)->finalize (object);
 }
@@ -248,7 +245,6 @@ static GstCaps* gst_ccnx_src_get_caps (GstBaseSrc* basesrc)
     return FALSE;
 
   return gst_ccnx_depkt_get_caps (src->mDepkt);
- 
 }
 
 static gboolean
@@ -317,7 +313,7 @@ gst_ccnx_src_do_seek (GstBaseSrc *basesrc, GstSegment *segment)
 }
 
 static gboolean
-gst_ccnx_src_check_get_range (GstBaseSrc *src)
+gst_ccnx_src_check_get_range (GstBaseSrc * basesrc)
 {
   return FALSE;
 }

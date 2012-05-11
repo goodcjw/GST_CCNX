@@ -42,18 +42,18 @@ struct _GstCCNxDepacketizer {
   gint64                         mDurationNs;
   gboolean                       mRunning;
   /* ? raw content of content data ? */
-  const char                    *mCaps;
+  struct ccn_charbuf            *mCaps;
   /* using the signing time as video starttime */
-  const struct ccn_charbuf      *mStartTime;  
+  struct ccn_charbuf            *mStartTime;  
   gboolean                       mSeekSegment;
   /* ??? */
   gint64                         mDurationLast;
   // TODO shall we have a queue for command?
 
   struct ccn                    *mCCNx;
-  const char                    *mName;
-  const char                    *mNameSegments;
-  const char                    *mNameFrames;
+  struct ccn_charbuf            *mName;
+  struct ccn_charbuf            *mNameSegments;
+  struct ccn_charbuf            *mNameFrames;
 
   GstPipeline                   *mPipeline;
   GstCCNxSegmenter              *mSegmenter;
@@ -70,6 +70,9 @@ struct _GstCCNxDepacketizer {
   */
 };
 
+GstCCNxDepacketizer * gst_ccnx_depkt_create (
+    const gchar *name, gint32 window_size, gint32 time_out, gint32 retries);
+void gst_ccnx_depkt_destroy (GstCCNxDepacketizer ** object);
 gboolean gst_ccnx_depkt_start (GstCCNxDepacketizer *object);
 gboolean gst_ccnx_depkt_stop (GstCCNxDepacketizer *object);
 GstCaps* gst_ccnx_depkt_get_caps (GstCCNxDepacketizer *);

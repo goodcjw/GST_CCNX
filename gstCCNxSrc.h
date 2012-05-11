@@ -48,17 +48,10 @@ typedef struct _GstCCNxSrcClass GstCCNxSrcClass;
 struct _GstCCNxSrc {
   GstBaseSrc                 *mBase;
 
-  //  GstBuffer *mapbuf;
-  //  GstPad *sinkpad, *srcpad;
-
-  gchar                      *mName;  /* name of the CCNx interest */
-  GstCCNxDepacketizer        *mDepkt; /* the depacketizer component */
+  gchar                      *mName;         /* name of the CCNx interest */
+  GstCCNxDepacketizer        *mDepkt;        /* the depacketizer component */
   gboolean                    mNoLocking;
   gint64                      mSeeking;
-  /** 
-      self.seek_in_progress = None
-      self._no_locking = False
-  */
 };
 
 struct _GstCCNxSrcClass {

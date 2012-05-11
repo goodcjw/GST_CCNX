@@ -17,6 +17,11 @@
  * Boston, MA 02111-1307, USA.
  */
 
+extern "C" {
+#include <ccn/uri.h>
+#include <ccn/charbuf.h>
+}
+
 #include "gstCCNxDepacketizer.h"
 
 static void gst_ccnx_depkt_set_window (
@@ -54,6 +59,7 @@ static enum ccn_upcall_res gst_ccnx_depkt_upcall (
 
 // def get_status(self): ?? just for debugging?
 static void gst_ccnx_depkt_num2seg (guint64 num, struct ccn_charbuf* seg);
+static guint64 gst_ccnx_depkt_seg2num (const struct ccn_charbuf* seg);
 
 static void
 gst_ccnx_depkt_set_window (GstCCNxDepacketizer *object, unsigned int window)
@@ -99,6 +105,65 @@ gst_ccnx_depkt_check_duration_initial(GstCCNxDepacketizer *object)
   if (object == NULL)
     return FALSE;
   return FALSE;
+}
+
+/* public methods */
+
+GstCCNxDepacketizer *
+gst_ccnx_depkt_create (
+    const gchar *name, gint32 window_size, gint32 time_out, gint32 retries)
+{
+  GstCCNxDepacketizer * object =
+      (GstCCNxDepacketizer* ) malloc (sizeof(GstCCNxDepacketizer));
+  object->mWindowSize = window_size;
+  object->mInterestLifetime = time_out;
+  object->mInterestRetries = retries;
+
+  // TODO initialize buffer queue
+  // object->mQue ??
+  object->mDurationNs = -1;
+  object->mRunning = FALSE;
+  object->mCaps = NULL;
+  object->mStartTime = NULL;
+  object->mSeekSegment = FALSE;
+  object->mDurationLast = -1;
+
+  // TODO initialize cmd queue
+  // object->mQue ??
+  object->mCCNx = ccn_create ();
+  if (ccn_connect (object->mCCNx, NULL) == -1) {
+    // TODO log warning
+    gst_ccnx_depkt_destroy (&object);
+    return NULL;
+  }
+  
+  object->mName = ccn_charbuf_create ();
+  object->mNameSegments = ccn_charbuf_create ();
+  object->mNameFrames = ccn_charbuf_create ();
+  ccn_name_from_uri (object->mName, name);
+  ccn_name_from_uri (object->mNameSegments, name);
+  ccn_name_from_uri (object->mNameSegments, "segments");
+  ccn_name_from_uri (object->mNameFrames, name);
+  ccn_name_from_uri (object->mNameFrames, "index");
+
+  return object;
+}
+
+void
+gst_ccnx_depkt_destroy (GstCCNxDepacketizer ** object)
+{
+  GstCCNxDepacketizer * depkt = *object;
+  if (depkt != NULL) {
+    ccn_destroy (&depkt->mCCNx);
+    ccn_charbuf_destroy (&depkt->mCaps);
+    ccn_charbuf_destroy (&depkt->mStartTime);
+    ccn_charbuf_destroy (&depkt->mName);
+    ccn_charbuf_destroy (&depkt->mNameSegments);
+    ccn_charbuf_destroy (&depkt->mNameFrames);
+    gst_object_unref (depkt->mPipeline);
+    gst_object_unref (depkt->mSegmenter);
+    *object = NULL;
+  }
 }
 
 gboolean
@@ -192,7 +257,7 @@ gst_ccnx_depkt_num2seg (guint64 num, struct ccn_charbuf* seg)
   }
   ccn_charbuf_append_value(seg, 0, 1);
   // reverse the buffer
-  for (int i = 0; i < seg->length / 2; i++) {
+  for (size_t i = 0; i < seg->length / 2; i++) {
     aByte = seg->buf[i];
     seg->buf[i] = seg->buf[seg->length - i - 1];
     seg->buf[seg->length - i - 1] = aByte;
