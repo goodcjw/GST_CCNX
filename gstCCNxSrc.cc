@@ -292,7 +292,6 @@ gst_ccnx_src_create (GstBaseSrc * basesrc, guint64 offset, guint length,
 static gboolean
 gst_ccnx_src_query (GstBaseSrc * basesrc, GstQuery * query)
 {
-  /* TODO call depacketizer */
   if (basesrc == NULL || query == NULL)
     return FALSE;
 
@@ -313,21 +312,21 @@ gst_ccnx_src_do_seek (GstBaseSrc *basesrc, GstSegment *segment)
   GstCCNxSrc *src = GST_CCNX_SRC (basesrc);
 
   src->mSeeking = segment->start;
-  gxg_ccnx_depkt_seek (src->mDepkt, segment->start);
+  gst_ccnx_depkt_seek (src->mDepkt, segment->start);
   return TRUE;
 }
 
 static gboolean
 gst_ccnx_src_check_get_range (GstBaseSrc *src)
 {
-  /* TODO */
   return FALSE;
 }
 
 static gboolean
-gst_ccnx_src_unlock_stop (GstBaseSrc * src)
+gst_ccnx_src_unlock_stop (GstBaseSrc * basesrc)
 {
-  /* TODO */
+  GstCCNxSrc *src = GST_CCNX_SRC (basesrc);
+  src->mNoLocking = FALSE;
   return FALSE;
 }
 
