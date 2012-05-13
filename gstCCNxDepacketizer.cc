@@ -47,7 +47,6 @@ static enum ccn_upcall_res gst_ccnx_depkt_duration_result (
 
 static gboolean
 gst_ccnx_depkt_express_interest (GstCCNxDepacketizer *object, const char* seg);
-
 static void gst_ccnx_depkt_process_response (GstCCNxDepacketizer *object);
 static void gst_ccnx_depkt_push_data (
     GstCCNxDepacketizer *object, const struct ccn_charbuf* buf);
@@ -115,17 +114,19 @@ gst_ccnx_depkt_create (
     const gchar *name, gint32 window_size, gint32 time_out, gint32 retries)
 {
   GstCCNxDepacketizer * object =
-      (GstCCNxDepacketizer* ) malloc (sizeof(GstCCNxDepacketizer));
+      (GstCCNxDepacketizer *) malloc (sizeof(GstCCNxDepacketizer));
   object->mWindowSize = window_size;
   object->mInterestLifetime = time_out;
   object->mInterestRetries = retries;
 
+  object->mDataQueue = new queue<struct ccn_charbuf*>();
   object->mDurationNs = -1;
   object->mRunning = FALSE;
   object->mCaps = NULL;
   object->mStartTime = NULL;
   object->mSeekSegment = FALSE;
   object->mDurationLast = -1;
+  object->mCmdQueue = new queue<gint64>();
 
   object->mCCNx = ccn_create ();
   if (ccn_connect (object->mCCNx, NULL) == -1) {

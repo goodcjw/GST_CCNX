@@ -47,7 +47,7 @@ struct _GstCCNxDepacketizer {
   /* how many times to retry request */
   gint32                         mInterestRetries; 
   /* input data queue */
-  queue<struct ccn_charbuf*>     mDataQueue;
+  queue<struct ccn_charbuf*>    *mDataQueue;
   /* duration of the stream (in nanoseconds) */
   gint64                         mDurationNs;
   gboolean                       mRunning;
@@ -59,7 +59,7 @@ struct _GstCCNxDepacketizer {
   /* ??? */
   gint64                         mDurationLast;
   /* command queue seek in nanosecond */
-  queue<gint64>                  mCmdQueue;
+  queue<gint64>                 *mCmdQueue;
 
   struct ccn                    *mCCNx;
   struct ccn_charbuf            *mName;
