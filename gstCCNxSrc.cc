@@ -219,7 +219,7 @@ gst_ccnx_src_set_property (GObject * object, guint prop_id,
         if (ret) {
           src->mDepkt = gst_ccnx_depkt_create (
               src->mName,
-              GST_CCNX_WINDOW_SIZE,
+              GST_CCNX_DATA_WINDOW_SIZE,
               GST_CCNX_INTEREST_LIFETIME,
               GST_CCNX_INTEREST_RETRIES);
         }

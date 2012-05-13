@@ -28,6 +28,7 @@ extern "C" {
 
 #include <gst/gst.h>
 
+#include "gstCCNxFetchBuffer.h"
 #include "gstCCNxSegmenter.h"
 
 using namespace std;
@@ -66,7 +67,7 @@ struct _GstCCNxDepacketizer {
   struct ccn_charbuf            *mNameSegments;
   struct ccn_charbuf            *mNameFrames;
 
-  GstPipeline                   *mPipeline;
+  GstCCNxFetchBuffer            *mFetchBuffer;
   GstCCNxSegmenter              *mSegmenter;
 
   /* self._stats = { 'srtt': 0.05, 'rttvar': 0.01 } */

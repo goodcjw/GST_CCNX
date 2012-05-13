@@ -21,17 +21,25 @@
 #define __GST_CCNX_FETCH_BUFFER_H__
 
 #include <tr1/unordered_map>
+#include <gst/gst.h>
 
 using namespace std::tr1;
 
-typedef struct ccn_parsed_ContentObject ContentObject; 
+struct _GstCCNxDepacketizer;
+
+const gint64 GST_CCNX_COUNTER_STEP = 10;
+
+typedef struct ccn_parsed_ContentObject ContentObject;
+typedef struct _GstCCNxDepacketizer GstCCNxDepacketizer; 
 typedef struct _GstCCNxFetchBuffer GstCCNxFetchBuffer;
 typedef gboolean (*gst_ccnx_fb_request_cb) (
-    GstCCNxDepacketizer *object, const char* seg);
-typedef void (*gst_ccnx_fb_response_cb) (GstCCNxDepacketizer *object);
-*/
+    GstCCNxDepacketizer *object, gint64 seg);
+typedef void (*gst_ccnx_fb_response_cb) (
+    GstCCNxDepacketizer *object, ContentObject* data);
 
 struct _GstCCNxFetchBuffer {
+  /* just a back reference, not created here */
+  GstCCNxDepacketizer                   *mDepkt;
   /* size of input window */
   gint32                                 mWindowSize;
   gst_ccnx_fb_request_cb                 mRequester;
@@ -44,17 +52,9 @@ struct _GstCCNxFetchBuffer {
 };
 
 GstCCNxFetchBuffer * gst_ccnx_fb_create (
-    gint32 window, gst_ccnx_fb_request_cb req, gst_ccnx_fb_response_cb rep);
+    GstCCNxDepacketizer * depkt, gint32 window,
+    gst_ccnx_fb_request_cb req, gst_ccnx_fb_response_cb rep);
 
-GstCCNxFetchBuffer * gst_ccnx_fb_create (
-    gint32 window, gst_ccnx_fb_request_cb req, gst_ccnx_fb_response_cb rep)
-{
-  GstCCNxFetchBuffer * object =
-      (GstCCNxFetchBuffer *) malloc (sizeof(GstCCNxFetchBuffer));
-  object->mWindowSize = window;
-  object->mRequester = req;
-  object->mResponser = rep;
-  object->mBuffer = new unordered_map<gint64, ContentObject*>();
-}
+void gst_ccnx_fb_destroy (GstCCNxFetchBuffer ** object);
 
 #endif // __GST_CCNX_FETCH_BUFFER_H__

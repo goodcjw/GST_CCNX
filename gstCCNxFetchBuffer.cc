@@ -23,7 +23,6 @@ static void gst_ccnx_fb_reset (GstCCNxFetchBuffer* object, gint64 position);
 static void gst_ccnx_fb_put (
     GstCCNxFetchBuffer* object, gint64 num, ContentObject* pco);
 static void gst_ccnx_fb_timeout (GstCCNxFetchBuffer* object, gint64 num);
-static gint64 gst_ccnx_fb_get_position (GstCCNxFetchBuffer* object);
 static gint64 gst_ccnx_fb_get_size (GstCCNxFetchBuffer* object);
 static void gst_ccnx_fb_request_data (GstCCNxFetchBuffer* object);
 static void gst_ccnx_fb_push_data (GstCCNxFetchBuffer* object);
@@ -35,4 +34,94 @@ gst_ccnx_fb_reset (GstCCNxFetchBuffer* object, gint64 position)
   object->mPosition = position;
   object->mRequested = position - 1;
   object->mCounter = 0;
+
+  gst_ccnx_fb_request_data (object);
+}
+
+static void
+gst_ccnx_fb_put (GstCCNxFetchBuffer* object, gint64 num, ContentObject* pco)
+{
+  if (num >= object->mPosition) {
+    (*object->mBuffer)[num] = pco;
+  }
+  gst_ccnx_fb_push_data (object);
+}
+
+static void
+gst_ccnx_fb_timeout (GstCCNxFetchBuffer* object, gint64 num)
+{
+  gst_ccnx_fb_put (object, num, NULL);
+}
+
+static gint64
+gst_ccnx_fb_get_size (GstCCNxFetchBuffer* object)
+{
+  if (object->mPosition < 0)
+    return 0;
+
+  return object->mRequested - object->mPosition + 1;
+}
+
+static void
+gst_ccnx_fb_request_data (GstCCNxFetchBuffer* object)
+{
+  gint32 interest_left;
+
+  if (object->mCounter == 0)
+    interest_left = 2;
+  else
+    interest_left = 1;
+
+  object->mCounter = (object->mCounter + 1) % GST_CCNX_COUNTER_STEP;
+  gint64 stop = object->mPosition + object->mWindowSize - 1;
+
+  while (object->mRequested < stop && interest_left > 0) {
+    object->mRequested += 1;
+    interest_left -= 1;
+
+    if (! object->mRequester (object->mDepkt, object->mRequested))
+      return;
+  }
+}
+
+static void
+gst_ccnx_fb_push_data (GstCCNxFetchBuffer* object)
+{
+  while (!object->mBuffer->empty()) {
+    ContentObject* pco = (*object->mBuffer)[object->mPosition];
+    
+  }
+}
+
+/* public methods */
+GstCCNxFetchBuffer * gst_ccnx_fb_create (
+    GstCCNxDepacketizer * depkt, gint32 window,
+    gst_ccnx_fb_request_cb req, gst_ccnx_fb_response_cb rep)
+{
+  GstCCNxFetchBuffer * object =
+      (GstCCNxFetchBuffer *) malloc (sizeof(GstCCNxFetchBuffer));
+
+  object->mDepkt = depkt;
+  object->mBuffer = NULL;
+  object->mPosition = -1;
+  object->mRequested = -1;
+  object->mCounter = -1;
+
+  object->mWindowSize = window;
+  object->mRequester = req;
+  object->mResponser = rep;
+  object->mBuffer = new unordered_map<gint64, ContentObject*>();
+}
+
+void
+gst_ccnx_fb_destroy (GstCCNxFetchBuffer ** object)
+{
+  GstCCNxFetchBuffer * fb = *object;
+  if (fb != NULL) {
+    delete fb->mBuffer;
+    fb->mBuffer = NULL;
+    // mDepkt is just a back reference, we are not going to free it
+    fb->mDepkt = NULL;
+    *object = NULL;
+  }
 }

@@ -7,7 +7,8 @@ SOURCES	= \
 	test.cc \
 	gstCCNxSrc.cc \
 	gstCCNxDepacketizer.cc \
-	gstCCNxSegmenter.cc
+	gstCCNxSegmenter.cc \
+	gstCCNxFetchBuffer.cc
 
 OBJECTS	= $(SOURCES:.cc=.o)
 TARGET	= test

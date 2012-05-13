@@ -45,9 +45,10 @@ static enum ccn_upcall_res gst_ccnx_depkt_duration_result (
 
 // def check_duration(self):
 
-static gboolean
-gst_ccnx_depkt_express_interest (GstCCNxDepacketizer *object, const char* seg);
-static void gst_ccnx_depkt_process_response (GstCCNxDepacketizer *object);
+static gboolean gst_ccnx_depkt_express_interest (
+    GstCCNxDepacketizer *object, gint64 seg);
+static void gst_ccnx_depkt_process_response (
+    GstCCNxDepacketizer *object, ContentObject* pco);
 static void gst_ccnx_depkt_push_data (
     GstCCNxDepacketizer *object, const struct ccn_charbuf* buf);
 
@@ -56,7 +57,6 @@ static enum ccn_upcall_res gst_ccnx_depkt_upcall (
     enum ccn_upcall_kind kind,
     struct ccn_upcall_info *info);
 
-// def get_status(self): ?? just for debugging?
 static void gst_ccnx_depkt_num2seg (guint64 num, struct ccn_charbuf* seg);
 static guint64 gst_ccnx_depkt_seg2num (const struct ccn_charbuf* seg);
 
@@ -144,8 +144,12 @@ gst_ccnx_depkt_create (
   ccn_name_from_uri (object->mNameFrames, name);
   ccn_name_from_uri (object->mNameFrames, "index");
 
-  // TODO not GstPipeline
-  object->mPipeline = (GstPipeline*) gst_pipeline_new ("");
+  object->mFetchBuffer = gst_ccnx_fb_create (
+      object, object->mWindowSize,
+      gst_ccnx_depkt_express_interest,
+      gst_ccnx_depkt_process_response);
+
+  // TODO create GstCCNxSegmenter
 
   return object;
 }
@@ -161,9 +165,10 @@ gst_ccnx_depkt_destroy (GstCCNxDepacketizer ** object)
     ccn_charbuf_destroy (&depkt->mName);
     ccn_charbuf_destroy (&depkt->mNameSegments);
     ccn_charbuf_destroy (&depkt->mNameFrames);
-    // TODO not GstPipeline
-    gst_object_unref (depkt->mPipeline);
-    gst_object_unref (depkt->mSegmenter);
+
+    gst_ccnx_fb_destroy (&depkt->mFetchBuffer);
+    // TODO destroy GstCCNxSegmenter
+
     *object = NULL;
   }
 }
@@ -209,7 +214,7 @@ gst_ccnx_depkt_duration_result (
 }
 
 static gboolean
-gst_ccnx_depkt_express_interest (GstCCNxDepacketizer *object, const char* seg)
+gst_ccnx_depkt_express_interest (GstCCNxDepacketizer *object, gint64 seg)
 {
   // TODO
   // mNameSegments
@@ -217,7 +222,8 @@ gst_ccnx_depkt_express_interest (GstCCNxDepacketizer *object, const char* seg)
 }
 
 static void
-gst_ccnx_depkt_process_response (GstCCNxDepacketizer *object)
+gst_ccnx_depkt_process_response (
+    GstCCNxDepacketizer *object, ContentObject* pco)
 {
   // TODO
 }
