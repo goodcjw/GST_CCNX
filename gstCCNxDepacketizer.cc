@@ -119,7 +119,7 @@ gst_ccnx_depkt_create (
   object->mInterestLifetime = time_out;
   object->mInterestRetries = retries;
 
-  object->mDataQueue = new queue<struct ccn_charbuf*>();
+  object->mDataQueue = new queue<GstCCNxDataQueueEntry*>();
   object->mDurationNs = -1;
   object->mRunning = FALSE;
   object->mCaps = NULL;

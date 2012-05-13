@@ -37,6 +37,7 @@
 #  include <config.h>
 #endif
 
+#include <unistd.h>
 #include <gst/gst.h>
 
 #include "gstCCNxSrc.h"
@@ -85,7 +86,6 @@ static void gst_ccnx_src_get_property (GObject * object, guint prop_id,
 static GstCaps* gst_ccnx_src_get_caps (GstBaseSrc* basesrc);
 static gboolean gst_ccnx_src_start (GstBaseSrc * basesrc);
 static gboolean gst_ccnx_src_stop (GstBaseSrc * basesrc);
-
 static gboolean gst_ccnx_src_is_seekable (GstBaseSrc * basesrc);
 static gboolean gst_ccnx_src_unlock (GstBaseSrc * basesrc);
 static GstFlowReturn gst_ccnx_src_create (
@@ -155,6 +155,7 @@ gst_ccnx_src_init (GstCCNxSrc * src, GstCCNxSrcClass * gclass)
   src->mName = NULL;
   src->mDepkt = NULL;
   src->mNoLocking = FALSE;
+  src->mSeeking = -1;
 }
 
 static void
@@ -291,13 +292,49 @@ gst_ccnx_src_create (
     GstBaseSrc * basesrc, guint64 offset, guint length, GstBuffer ** buffer)
 {
   GstCCNxSrc *src = GST_CCNX_SRC (basesrc);
+  GstBuffer *buf;
   
   if (src->mNoLocking) {
     return GST_FLOW_WRONG_STATE;
   }
   
   while (TRUE) {
-    /* TODO call depacketizer */
+    if (src->mDepkt->mDataQueue->empty()) {
+      if (src->mNoLocking) {
+        return GST_FLOW_WRONG_STATE;
+      }
+      else {
+        /* starving for data, sleep for a while */
+        sleep(GST_CCNX_DEPKT_QUEUE_TIMEOUT);
+        continue;
+      }
+    }
+
+    GstCCNxDataQueueEntry * data_entry = src->mDepkt->mDataQueue->front();
+    src->mDepkt->mDataQueue->pop();
+    
+    // TODO multithreading on the queue ???
+    if (src->mNoLocking)
+      return GST_FLOW_WRONG_STATE;
+
+    if (src->mSeeking >= 0) {
+      if (data_entry->mState != GST_CMD_SEEK) {
+        /* skipping prefetched junk */
+        /* ??? queue.task_done() */
+        continue;
+      }
+      /* pushing seek buufer */
+      GstEvent * event = gst_event_new_new_segment(
+          FALSE, 1.0, GST_FORMAT_TIME,
+          src->mSeeking, -1, src->mSeeking);
+      GstPad * src_pad = gst_element_get_static_pad (
+          &src->mBase.element, "src");
+      gst_pad_push_event (src_pad, event);
+      src->mSeeking = -1;
+      buf = gst_buffer_new ();
+      GST_BUFFER_FLAG_SET (buf, GST_BUFFER_FLAG_DISCONT);
+      return GST_FLOW_OK;
+    }
     
   }
 
@@ -314,7 +351,7 @@ gst_ccnx_src_query (GstBaseSrc * basesrc, GstQuery * query)
   GstCCNxSrc *src = GST_CCNX_SRC (basesrc);
 
   if (query->type != GST_QUERY_DURATION)
-    return ((GstBaseSrcClass *) parent_class)->query (src->mBase, query);
+    return ((GstBaseSrcClass *) parent_class)->query (&src->mBase, query);
 
   gint64 duration = src->mDepkt->mDurationNs;
   gst_query_set_duration (query, GST_FORMAT_TIME, duration);

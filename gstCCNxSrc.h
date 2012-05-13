@@ -46,7 +46,7 @@ typedef struct _GstCCNxSrc      GstCCNxSrc;
 typedef struct _GstCCNxSrcClass GstCCNxSrcClass;
 
 struct _GstCCNxSrc {
-  GstBaseSrc                 *mBase;
+  GstBaseSrc                  mBase;
 
   gchar                      *mName;         /* name of the CCNx interest */
   GstCCNxDepacketizer        *mDepkt;        /* the depacketizer component */

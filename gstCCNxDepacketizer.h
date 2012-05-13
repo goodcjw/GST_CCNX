@@ -39,8 +39,20 @@ const gint32 GST_CCNX_INTEREST_LIFETIME = 4096;
 const gint32 GST_CCNX_INTEREST_RETRIES = 1; 
 const gint32 GST_CCNX_CHUNK_SIZE = 3900;
 const gint32 GST_CCNX_FRESHNESS = 1800;  /* 30 * 60 seconds */
+const gint32 GST_CCNX_DEPKT_QUEUE_TIMEOUT = 1; /* in second */
+
+typedef enum {
+  GST_CMD_INVALID,
+  GST_CMD_SEEK
+} GstCCNxCmd;
 
 typedef struct _GstCCNxDepacketizer GstCCNxDepacketizer;
+typedef struct _GstCCNxDataQueueEntry GstCCNxDataQueueEntry;
+
+struct _GstCCNxDataQueueEntry {
+  GstCCNxCmd                     mState;
+  struct ccn_charbuf            *mData;
+};
 
 struct _GstCCNxDepacketizer {
   /* size of input window */
@@ -50,7 +62,7 @@ struct _GstCCNxDepacketizer {
   /* how many times to retry request */
   gint32                         mInterestRetries; 
   /* input data queue */
-  queue<struct ccn_charbuf*>    *mDataQueue;
+  queue<GstCCNxDataQueueEntry*> *mDataQueue;
   /* duration of the stream (in nanoseconds) */
   gint64                         mDurationNs;
   gboolean                       mRunning;
