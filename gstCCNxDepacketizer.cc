@@ -50,7 +50,7 @@ gst_ccnx_depkt_express_interest (GstCCNxDepacketizer *object, const char* seg);
 
 static void gst_ccnx_depkt_process_response (GstCCNxDepacketizer *object);
 static void gst_ccnx_depkt_push_data (
-    GstCCNxDepacketizer *object, const char* buf);
+    GstCCNxDepacketizer *object, const struct ccn_charbuf* buf);
 
 static enum ccn_upcall_res gst_ccnx_depkt_upcall (
     struct ccn_closure *selfp,
@@ -65,6 +65,7 @@ static void
 gst_ccnx_depkt_set_window (GstCCNxDepacketizer *object, unsigned int window)
 {
   // TODO
+  //  object->mPipeline = 
 }
 
 static void
@@ -119,8 +120,6 @@ gst_ccnx_depkt_create (
   object->mInterestLifetime = time_out;
   object->mInterestRetries = retries;
 
-  // TODO initialize buffer queue
-  // object->mQue ??
   object->mDurationNs = -1;
   object->mRunning = FALSE;
   object->mCaps = NULL;
@@ -128,8 +127,6 @@ gst_ccnx_depkt_create (
   object->mSeekSegment = FALSE;
   object->mDurationLast = -1;
 
-  // TODO initialize cmd queue
-  // object->mQue ??
   object->mCCNx = ccn_create ();
   if (ccn_connect (object->mCCNx, NULL) == -1) {
     // TODO log warning
@@ -146,6 +143,9 @@ gst_ccnx_depkt_create (
   ccn_name_from_uri (object->mNameFrames, name);
   ccn_name_from_uri (object->mNameFrames, "index");
 
+  // TODO not GstPipeline
+  object->mPipeline = (GstPipeline*) gst_pipeline_new ("");
+
   return object;
 }
 
@@ -160,6 +160,7 @@ gst_ccnx_depkt_destroy (GstCCNxDepacketizer ** object)
     ccn_charbuf_destroy (&depkt->mName);
     ccn_charbuf_destroy (&depkt->mNameSegments);
     ccn_charbuf_destroy (&depkt->mNameFrames);
+    // TODO not GstPipeline
     gst_object_unref (depkt->mPipeline);
     gst_object_unref (depkt->mSegmenter);
     *object = NULL;
@@ -221,7 +222,8 @@ gst_ccnx_depkt_process_response (GstCCNxDepacketizer *object)
 }
 
 static void
-gst_ccnx_depkt_push_data (GstCCNxDepacketizer *object, const char* buf)
+gst_ccnx_depkt_push_data (
+    GstCCNxDepacketizer *object, const struct ccn_charbuf* buf)
 {
   // TODO
 }

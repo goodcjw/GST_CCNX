@@ -164,7 +164,7 @@ gst_ccnx_src_finalize (GObject * object)
   src = GST_CCNX_SRC (object);
 
   g_free (src->mName);
-  gst_ccnx_src_destroy (&src->mDepkt);
+  gst_ccnx_depkt_destroy (&src->mDepkt);
 
   G_OBJECT_CLASS (parent_class)->finalize (object);
 }
@@ -214,11 +214,22 @@ gst_ccnx_src_set_property (GObject * object, guint prop_id,
 
   switch (prop_id) {
     case PROP_CCNX_NAME:
-      gst_ccnx_src_set_name(src, g_value_get_string(value));
+      {
+        gboolean ret = gst_ccnx_src_set_name (src, g_value_get_string(value));
+        if (ret) {
+          src->mDepkt = gst_ccnx_depkt_create (
+              src->mName,
+              GST_CCNX_WINDOW_SIZE,
+              GST_CCNX_INTEREST_LIFETIME,
+              GST_CCNX_INTEREST_RETRIES);
+        }
       break;
+      }
     default:
-      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+      {
+        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
+      }
   }
 }
 
@@ -271,17 +282,26 @@ static gboolean
 gst_ccnx_src_unlock (GstBaseSrc * basesrc)
 {
   GstCCNxSrc *src = GST_CCNX_SRC (basesrc);
-  if (src == NULL)
-    return FALSE;
   src->mNoLocking = TRUE;
   return TRUE;
 }
 
 static GstFlowReturn
-gst_ccnx_src_create (GstBaseSrc * basesrc, guint64 offset, guint length,
-                     GstBuffer ** buffer)
+gst_ccnx_src_create (
+    GstBaseSrc * basesrc, guint64 offset, guint length, GstBuffer ** buffer)
 {
-  /* TODO call depacketizer */
+  GstCCNxSrc *src = GST_CCNX_SRC (basesrc);
+  
+  if (src->mNoLocking) {
+    return GST_FLOW_WRONG_STATE;
+  }
+  
+  while (TRUE) {
+    /* TODO call depacketizer */
+    
+  }
+
+wrong_sate:
   return GST_FLOW_ERROR;
 }
 
