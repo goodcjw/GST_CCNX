@@ -149,7 +149,8 @@ gst_ccnx_depkt_create (
       gst_ccnx_depkt_express_interest,
       gst_ccnx_depkt_process_response);
 
-  // TODO create GstCCNxSegmenter
+  object->mSegmenter = gst_ccnx_segmenter_create (
+      object, gst_ccnx_depkt_push_data, GST_CCNX_CHUNK_SIZE);
 
   return object;
 }
@@ -159,16 +160,17 @@ gst_ccnx_depkt_destroy (GstCCNxDepacketizer ** object)
 {
   GstCCNxDepacketizer * depkt = *object;
   if (depkt != NULL) {
+    /* destroy dynamic allocated structs */
     ccn_destroy (&depkt->mCCNx);
     ccn_charbuf_destroy (&depkt->mCaps);
     ccn_charbuf_destroy (&depkt->mStartTime);
     ccn_charbuf_destroy (&depkt->mName);
     ccn_charbuf_destroy (&depkt->mNameSegments);
     ccn_charbuf_destroy (&depkt->mNameFrames);
-
     gst_ccnx_fb_destroy (&depkt->mFetchBuffer);
-    // TODO destroy GstCCNxSegmenter
-
+    gst_ccnx_segmenter_destroy (&depkt->mSegmenter);
+    /* destroy the object itself */
+    free (depkt);
     *object = NULL;
   }
 }

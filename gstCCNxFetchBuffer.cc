@@ -111,6 +111,8 @@ GstCCNxFetchBuffer * gst_ccnx_fb_create (
   object->mRequester = req;
   object->mResponser = rep;
   object->mBuffer = new unordered_map<gint64, ContentObject*>();
+
+  return object;
 }
 
 void
@@ -118,10 +120,12 @@ gst_ccnx_fb_destroy (GstCCNxFetchBuffer ** object)
 {
   GstCCNxFetchBuffer * fb = *object;
   if (fb != NULL) {
-    delete fb->mBuffer;
-    fb->mBuffer = NULL;
-    // mDepkt is just a back reference, we are not going to free it
+    /* mDepkt is just a back reference, we are not going to free it */
     fb->mDepkt = NULL;
+    /* destroy dynamic allocated structs */
+    delete fb->mBuffer;
+    /* destroy the object itself */
+    free (fb);
     *object = NULL;
   }
 }

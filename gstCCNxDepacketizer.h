@@ -37,6 +37,8 @@ const gint32 GST_CCNX_DATA_WINDOW_SIZE = 18;
 const gint32 GST_CCNX_CMD_WINDOW_SIZE = 2;
 const gint32 GST_CCNX_INTEREST_LIFETIME = 4096;
 const gint32 GST_CCNX_INTEREST_RETRIES = 1; 
+const gint32 GST_CCNX_CHUNK_SIZE = 3900;
+const gint32 GST_CCNX_FRESHNESS = 1800;  /* 30 * 60 seconds */
 
 typedef struct _GstCCNxDepacketizer GstCCNxDepacketizer;
 

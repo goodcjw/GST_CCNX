@@ -28,12 +28,16 @@ extern "C" {
 const guint32 PACKET_HDR_LEN = 4;
 const guint32 SEGMENT_HDR_LEN = 20;
 
+struct _GstCCNxDepacketizer;
+
+typedef struct _GstCCNxDepacketizer GstCCNxDepacketizer; 
 typedef struct _GstCCNxSegmenter GstCCNxSegmenter;
 
 typedef void (*gst_ccnx_seg_callback) (
-    GstCCNxSegmenter *object, const char* buf);
+    GstCCNxDepacketizer *object, const struct ccn_charbuf* buf);
 
 struct _GstCCNxSegmenter {
+  GstCCNxDepacketizer          *mDepkt;
   gst_ccnx_seg_callback         mCallback;
   guint32                       mMaxSize;
   struct ccn_charbuf           *mPktContent;
@@ -42,7 +46,8 @@ struct _GstCCNxSegmenter {
   gboolean                      mPktLost;
 };
 
-void gst_ccnx_segmenter_init (
-    GstCCNxSegmenter *object, gst_ccnx_seg_callback func, guint32 max_size);
+GstCCNxSegmenter * gst_ccnx_segmenter_create (
+    GstCCNxDepacketizer * depkt, gst_ccnx_seg_callback func, guint32 max_size);
+void gst_ccnx_segmenter_destroy (GstCCNxSegmenter ** object);
 
 #endif // __GST_CCNX_SEGMENTER_H__

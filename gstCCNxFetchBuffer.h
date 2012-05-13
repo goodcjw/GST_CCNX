@@ -25,9 +25,9 @@
 
 using namespace std::tr1;
 
-struct _GstCCNxDepacketizer;
-
 const gint64 GST_CCNX_COUNTER_STEP = 10;
+
+struct _GstCCNxDepacketizer;
 
 typedef struct ccn_parsed_ContentObject ContentObject;
 typedef struct _GstCCNxDepacketizer GstCCNxDepacketizer; 
