@@ -17,32 +17,22 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#ifndef __GST_CCNX_SEGMENTER_H__
-#define __GST_CCNX_SEGMENTER_H__
+#include "gstCCNxFetchBuffer.h"
 
-#include <gst/gst.h>
-extern "C" {
-#include <ccn/ccn.h>
+static void gst_ccnx_fb_reset (GstCCNxFetchBuffer* object, gint64 position);
+static void gst_ccnx_fb_put (
+    GstCCNxFetchBuffer* object, gint64 num, ContentObject* pco);
+static void gst_ccnx_fb_timeout (GstCCNxFetchBuffer* object, gint64 num);
+static gint64 gst_ccnx_fb_get_position (GstCCNxFetchBuffer* object);
+static gint64 gst_ccnx_fb_get_size (GstCCNxFetchBuffer* object);
+static void gst_ccnx_fb_request_data (GstCCNxFetchBuffer* object);
+static void gst_ccnx_fb_push_data (GstCCNxFetchBuffer* object);
+
+static void
+gst_ccnx_fb_reset (GstCCNxFetchBuffer* object, gint64 position)
+{
+  object->mBuffer->clear();
+  object->mPosition = position;
+  object->mRequested = position - 1;
+  object->mCounter = 0;
 }
-
-const guint32 PACKET_HDR_LEN = 4;
-const guint32 SEGMENT_HDR_LEN = 20;
-
-typedef struct _GstCCNxSegmenter GstCCNxSegmenter;
-
-typedef void (*gst_ccnx_seg_callback) (
-    GstCCNxSegmenter *object, const char* buf);
-
-struct _GstCCNxSegmenter {
-  gst_ccnx_seg_callback         mCallback;
-  guint32                       mMaxSize;
-  struct ccn_charbuf           *mPktContent;
-  guint32                       mPktElements;
-  guint32                       mPktElementOff;
-  gboolean                      mPktLost;
-};
-
-void gst_ccnx_segmenter_init (
-    GstCCNxSegmenter *object, gst_ccnx_seg_callback func, guint32 max_size);
-
-#endif // __GST_CCNX_SEGMENTER_H__
