@@ -45,13 +45,12 @@ static enum ccn_upcall_res gst_ccnx_depkt_duration_result (
     struct ccn_upcall_info *info);
 
 // def check_duration(self):
-
 static gboolean gst_ccnx_depkt_express_interest (
     GstCCNxDepacketizer *object, gint64 seg);
 static void gst_ccnx_depkt_process_response (
     GstCCNxDepacketizer *object, ContentObject* pco);
 static void gst_ccnx_depkt_push_data (
-    GstCCNxDepacketizer *object, const struct ccn_charbuf* buf);
+    GstCCNxDepacketizer *object, const GstBuffer * buf);
 
 static enum ccn_upcall_res gst_ccnx_depkt_upcall (
     struct ccn_closure *selfp,
@@ -233,7 +232,7 @@ gst_ccnx_depkt_process_response (
 
 static void
 gst_ccnx_depkt_push_data (
-    GstCCNxDepacketizer *object, const struct ccn_charbuf* buf)
+    GstCCNxDepacketizer *object, const GstBuffer * buf)
 {
   // TODO
 }

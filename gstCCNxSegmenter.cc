@@ -17,14 +17,21 @@
  * Boston, MA 02111-1307, USA.
  */
 
+#include <assert.h>
+
 #include "gstCCNxUtils.h"
 #include "gstCCNxSegmenter.h"
 
+GstCCNxPacketHeader* gst_ccnx_packet_header_unpack (
+    const struct ccn_charbuf*);
+GstCCNxSegmentHeader* gst_ccnx_segment_header_unpack (
+    const struct ccn_charbuf * header_buf);
 /* convertor bettwen GstBuffer and CCNx segment */
-GstCCNxPacketHeader* gst_ccnx_packet_header_unpack (const struct ccn_charbuf*);
-struct ccn_charbuf* gst_ccnx_segmenter_from_buffer (const GstBuffer*);
-GstBuffer* gst_ccnx_segmenter_to_buffer(
-    const struct ccn_charbuf * segment, gint32 offset);
+GstBuffer* gst_ccnx_segmenter_to_buffer (
+    const struct ccn_charbuf * segment, gint32& offset);
+void gst_ccnx_segmenter_pkt_lost (GstCCNxSegmenter* object);
+void gst_ccnx_segmenter_process_pkt (
+    GstCCNxSegmenter* object, const struct ccn_charbuf* pkt_buffer);
 
 GstCCNxPacketHeader * 
 gst_ccnx_packet_header_unpack (const struct ccn_charbuf * header_buf)
@@ -52,22 +59,6 @@ gst_ccnx_segment_header_unpack (const struct ccn_charbuf * header_buf)
   return header;
 }
 
-void gst_ccnx_segmenter_process_buffer (
-    GstCCNxSegmenter* object,
-    const GstBuffer* buffer, 
-    gboolean start_fresh,
-    gboolean flush);
-
-void gst_ccnx_segmenter_process_buffer_split (
-    GstCCNxSegmenter* object,
-    const GstBuffer*);
-
-void gst_ccnx_segmenter_pkt_lost (GstCCNxSegmenter* object);
-void gst_ccnx_segmenter_process_pkt (
-    GstCCNxSegmenter* object, const struct ccn_charbuf* pkt_buffer);
-void gst_ccnx_segmenter_send_callback (
-    GstCCNxSegmenter* object, gint32 left, gint32 size);
-
 void gst_ccnx_segmenter_pkt_lost (GstCCNxSegmenter* object)
 {
   object->mPktLost = TRUE;
@@ -78,13 +69,6 @@ void gst_ccnx_segmenter_pkt_lost (GstCCNxSegmenter* object)
     ccn_charbuf_reset(object->mPktContent);
   
   object->mPktElements = 0;
-}
-
-struct ccn_charbuf*
-gst_ccnx_segmenter_from_buffer (const GstBuffer*)
-{
-  // TODO
-  return NULL;
 }
 
 GstBuffer*
@@ -123,32 +107,17 @@ ret_state:
   return ret;
 }
 
-void gst_ccnx_segmenter_process_buffer (
-    GstCCNxSegmenter* object,
-    const GstBuffer* buffer, 
-    gboolean start_fresh,
-    gboolean flush)
-{
-  if (start_fresh && object->mPktContent->length > 0)
-    gst_ccnx_segmenter_send_callback (object, 0, -1);
-  // TODO
-}
-
-void gst_ccnx_segmenter_process_buffer_split (
-    GstCCNxSegmenter* object,
-    const GstBuffer*)
-{
-  // TODO
-}
-
 void gst_ccnx_segmenter_process_pkt (
     GstCCNxSegmenter* object, const struct ccn_charbuf* pkt_buffer)
 {
-  struct ccn_charbuf * hdr_buffer
-      = ccn_charbuf_create ();
+  struct ccn_charbuf * hdr_buffer = NULL;
+  GstCCNxPacketHeader * pkt_header = NULL;
+  GstBuffer * buf = NULL;
+
+  hdr_buffer = ccn_charbuf_create ();
   ccn_charbuf_append (hdr_buffer, pkt_buffer->buf, GST_CCNX_PACKET_HDR_LEN);
-  GstCCNxPacketHeader * pkt_header
-      = gst_ccnx_packet_header_unpack (hdr_buffer);
+
+  pkt_header = gst_ccnx_packet_header_unpack (hdr_buffer);
 
   if ( !object->mPktLost || object->mPktContent->length > 0)
     pkt_header->mOffset = 0;
@@ -159,20 +128,27 @@ void gst_ccnx_segmenter_process_pkt (
                       pkt_buffer->length - pkt_header->mOffset);
   object->mPktElements += pkt_header->mCount;
 
-  // TODO
+  gint32 off = 0;
+  while (object->mPktElements > 0) {
+    buf = gst_ccnx_segmenter_to_buffer (object->mPktContent, off);
+
+    if (buf == NULL)
+      break;
+
+    if (object->mPktLost) {
+      GST_BUFFER_FLAG_SET (buf, GST_BUFFER_FLAG_DISCONT);
+      object->mPktLost = FALSE;
+    }
+
+    object->mCallback (object->mDepkt, buf);
+    object->mPktElements -= 1;
+  }
+  assert ((pkt_header->mLeft > 0 && object->mPktElements == 1) || 
+          object->mPktElements == 0);
 
   /* clean up memory */
   ccn_charbuf_destroy (&hdr_buffer);
   free (pkt_header);
-}
-
-void gst_ccnx_segmenter_send_callback (
-    GstCCNxSegmenter* object, gint32 left, gint32 size)
-{
-  if (size < 0) {
-    size = object->mPktContent->length;
-  }
-  // TODO
 }
 
 /* public methods */
