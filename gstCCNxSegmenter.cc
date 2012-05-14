@@ -21,22 +21,47 @@
 
 
 /* convertor bettwen GstBuffer and CCNx segment */
-struct ccn_charbuf * gst_ccnx_segmenter_from_buffer (const GstBuffer*);
-GstBuffer* gst_ccnx_segmenter_to_buffer(const struct ccn_charbuf*);
+GstCCNxPacketHeader* gst_ccnx_packet_header_unpack (const struct ccn_charbuf*);
+struct ccn_charbuf* gst_ccnx_segmenter_from_buffer (const GstBuffer*);
+GstBuffer* gst_ccnx_segmenter_to_buffer(
+    const struct ccn_charbuf * segment, gint32 offset);
+
+GstCCNxPacketHeader * 
+gst_ccnx_packet_header_unpack (const struct ccn_charbuf * header_buf)
+{
+  GstCCNxPacketHeader * header =
+      (GstCCNxPacketHeader *) malloc (sizeof(GstCCNxPacketHeader));
+  header->mLeft = (guint8) header_buf->buf[0];
+  header->mOffset = (guint16) header_buf->buf[1] * 256
+      + (guint16) header_buf->buf[2];
+  header->mCount = (guint8) header_buf->buf[2];
+  return header;
+}
+
+GstCCNxSegmentHeader *
+gst_ccnx_segment_header_unpack (const struct ccn_charbuf * header_buf)
+{
+  GstCCNxSegmentHeader * header =
+      (GstCCNxSegmentHeader *) malloc (sizeof(GstCCNxSegmentHeader));
+  
+  return header;
+}
 
 void gst_ccnx_segmenter_process_buffer (
     GstCCNxSegmenter* object,
-    const GstBuffer*, 
+    const GstBuffer* buffer, 
     gboolean start_fresh,
     gboolean flush);
 
-// Not currently in use?
-// void gst_ccnx_process_buffer_split (GstCCNxSegmenter* object, const GstBuffer*);
+void gst_ccnx_segmenter_process_buffer_split (
+    GstCCNxSegmenter* object,
+    const GstBuffer*);
 
 void gst_ccnx_segmenter_pkt_lost (GstCCNxSegmenter* object);
-void gst_ccnx_segmenter_process_pkt (const struct ccn_charbuf*);
+void gst_ccnx_segmenter_process_pkt (
+    GstCCNxSegmenter* object, const struct ccn_charbuf* pkt_buffer);
 void gst_ccnx_segmenter_send_callback (
-    GstCCNxSegmenter* object, guint32 left, guint size);
+    GstCCNxSegmenter* object, gint32 left, gint32 size);
 
 void gst_ccnx_segmenter_pkt_lost (GstCCNxSegmenter* object)
 {
@@ -58,29 +83,66 @@ gst_ccnx_segmenter_from_buffer (const GstBuffer*)
 }
 
 GstBuffer*
-gst_ccnx_segmenter_to_buffer(const struct ccn_charbuf*)
+gst_ccnx_segmenter_to_buffer(const struct ccn_charbuf* segment, gint32& offset)
 {
+  if (segment->length - offset < GST_CCNX_SEGMENT_HDR_LEN)
+    return NULL;
+
+  struct ccn_charbuf * segment_header = ccn_charbuf_create ();
+  ccn_charbuf_append (
+      segment_header, segment->buf + offset, GST_CCNX_SEGMENT_HDR_LEN);
+
   // TODO
   return NULL;
 }
 
 void gst_ccnx_segmenter_process_buffer (
     GstCCNxSegmenter* object,
-    const GstBuffer*, 
+    const GstBuffer* buffer, 
     gboolean start_fresh,
     gboolean flush)
 {
+  if (start_fresh && object->mPktContent->length > 0)
+    gst_ccnx_segmenter_send_callback (object, 0, -1);
   // TODO
 }
 
-void gst_ccnx_segmenter_process_pkt (const struct ccn_charbuf*)
+void gst_ccnx_segmenter_process_buffer_split (
+    GstCCNxSegmenter* object,
+    const GstBuffer*)
 {
   // TODO
+}
+
+void gst_ccnx_segmenter_process_pkt (
+    GstCCNxSegmenter* object, const struct ccn_charbuf* pkt_buffer)
+{
+  struct ccn_charbuf * hdr_buffer = ccn_charbuf_create ();
+  ccn_charbuf_append (hdr_buffer, pkt_buffer->buf, GST_CCNX_PACKET_HDR_LEN);
+  GstCCNxPacketHeader * header = gst_ccnx_packet_header_unpack (hdr_buffer);
+  
+  if ( !object->mPktLost || object->mPktContent->length > 0)
+    header->mOffset = 0;
+
+  header->mOffset += GST_CCNX_PACKET_HDR_LEN;
+  ccn_charbuf_append (object->mPktContent, 
+                      pkt_buffer->buf + header->mOffset,
+                      pkt_buffer->length - header->mOffset);
+  object->mPktElements += header->mCount;
+
+  // TODO
+
+  /* clean up memory */
+  ccn_charbuf_destroy (&hdr_buffer);
+  free (header);
 }
 
 void gst_ccnx_segmenter_send_callback (
-    GstCCNxSegmenter* object, guint32 left, guint size)
+    GstCCNxSegmenter* object, gint32 left, gint32 size)
 {
+  if (size < 0) {
+    size = object->mPktContent->length;
+  }
   // TODO
 }
 
@@ -94,7 +156,7 @@ gst_ccnx_segmenter_create (
 
   object->mDepkt = depkt;
   object->mCallback = func;
-  object->mMaxSize = max_size - PACKET_HDR_LEN;
+  object->mMaxSize = max_size - GST_CCNX_PACKET_HDR_LEN;
   object->mPktContent = ccn_charbuf_create();
   object->mPktElements = 0;
   object->mPktElementOff = 0;

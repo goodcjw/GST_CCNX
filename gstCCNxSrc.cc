@@ -335,10 +335,7 @@ gst_ccnx_src_create (
       GST_BUFFER_FLAG_SET (buf, GST_BUFFER_FLAG_DISCONT);
       return GST_FLOW_OK;
     }
-    
   }
-
-wrong_sate:
   return GST_FLOW_ERROR;
 }
 

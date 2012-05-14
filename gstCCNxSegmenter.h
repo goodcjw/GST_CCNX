@@ -25,13 +25,15 @@ extern "C" {
 #include <ccn/ccn.h>
 }
 
-const guint32 PACKET_HDR_LEN = 4;
-const guint32 SEGMENT_HDR_LEN = 20;
+const guint32 GST_CCNX_PACKET_HDR_LEN = 4;
+const guint32 GST_CCNX_SEGMENT_HDR_LEN = 20;
 
 struct _GstCCNxDepacketizer;
 
-typedef struct _GstCCNxDepacketizer GstCCNxDepacketizer; 
 typedef struct _GstCCNxSegmenter GstCCNxSegmenter;
+typedef struct _GstCCNxDepacketizer GstCCNxDepacketizer; 
+typedef struct _GstCCNxPacketHeader GstCCNxPacketHeader;
+typedef struct _GstCCNxSegmentHeader GstCCNxSegmentHeader;
 
 typedef void (*gst_ccnx_seg_callback) (
     GstCCNxDepacketizer *object, const struct ccn_charbuf* buf);
@@ -44,6 +46,18 @@ struct _GstCCNxSegmenter {
   guint32                       mPktElements;
   guint32                       mPktElementOff;
   gboolean                      mPktLost;
+};
+
+struct _GstCCNxPacketHeader {
+  guint8                        mLeft;
+  guint16                       mOffset;
+  guint8                        mCount;
+};
+
+struct _GstCCNxSegmentHeader {
+  guint32                       mSize;
+  guint64                       mTimestamp;
+  guint64                       mDuration;
 };
 
 GstCCNxSegmenter * gst_ccnx_segmenter_create (
