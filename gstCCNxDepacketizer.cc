@@ -22,6 +22,7 @@ extern "C" {
 #include <ccn/charbuf.h>
 }
 
+#include "gstCCNxUtils.h"
 #include "gstCCNxDepacketizer.h"
 
 static void gst_ccnx_depkt_set_window (
@@ -250,9 +251,7 @@ static guint64
 gst_ccnx_depkt_seg2num (const struct ccn_charbuf* seg)
 {
   guint64 num = 0;
-  for (int i = seg->length - 1; i >= 0; i--) {
-    num = seg->buf[seg->length - i - 1] + num * 256;
-  }
+  gst_ccnx_unpack_be_guint (&num, seg);
   return num;
 }
 

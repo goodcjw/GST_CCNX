@@ -1,6 +1,6 @@
 CC      = g++
 LIBS    = `pkg-config gstreamer-0.10 --libs` -lccn -lcrypto
-DEFS    = -DGST_CCNX_DEBUG
+DEFS    = -DGST_CCNX_DEBUG -DGST_CCNX_TEST
 CFLAGS	= -c `pkg-config gstreamer-0.10 --cflags` -Wall -DDEBUG -g
 
 SOURCES	= \
@@ -8,7 +8,8 @@ SOURCES	= \
 	gstCCNxSrc.cc \
 	gstCCNxDepacketizer.cc \
 	gstCCNxSegmenter.cc \
-	gstCCNxFetchBuffer.cc
+	gstCCNxFetchBuffer.cc \
+	gstCCNxUtils.cc
 
 OBJECTS	= $(SOURCES:.cc=.o)
 TARGET	= test

@@ -17,8 +17,8 @@
  * Boston, MA 02111-1307, USA.
  */
 
+#include "gstCCNxUtils.h"
 #include "gstCCNxSegmenter.h"
-
 
 /* convertor bettwen GstBuffer and CCNx segment */
 GstCCNxPacketHeader* gst_ccnx_packet_header_unpack (const struct ccn_charbuf*);
@@ -31,10 +31,11 @@ gst_ccnx_packet_header_unpack (const struct ccn_charbuf * header_buf)
 {
   GstCCNxPacketHeader * header =
       (GstCCNxPacketHeader *) malloc (sizeof(GstCCNxPacketHeader));
-  header->mLeft = (guint8) header_buf->buf[0];
-  header->mOffset = (guint16) header_buf->buf[1] * 256
-      + (guint16) header_buf->buf[2];
-  header->mCount = (guint8) header_buf->buf[2];
+
+  gst_ccnx_unpack_be_guint (&header->mLeft, header_buf->buf, 1);
+  gst_ccnx_unpack_be_guint (&header->mOffset, header_buf->buf + 1, 2);
+  gst_ccnx_unpack_be_guint (&header->mCount, header_buf->buf + 3, 1);
+
   return header;
 }
 
