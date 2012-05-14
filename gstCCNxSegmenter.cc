@@ -32,9 +32,9 @@ gst_ccnx_packet_header_unpack (const struct ccn_charbuf * header_buf)
   GstCCNxPacketHeader * header =
       (GstCCNxPacketHeader *) malloc (sizeof(GstCCNxPacketHeader));
 
-  gst_ccnx_unpack_be_guint (&header->mLeft, header_buf->buf, 1);
-  gst_ccnx_unpack_be_guint (&header->mOffset, header_buf->buf + 1, 2);
-  gst_ccnx_unpack_be_guint (&header->mCount, header_buf->buf + 3, 1);
+  gst_ccnx_unpack_be_guint (&header->mLeft, &header_buf->buf[0], 1);
+  gst_ccnx_unpack_be_guint (&header->mOffset, &header_buf->buf[1], 2);
+  gst_ccnx_unpack_be_guint (&header->mCount, &header_buf->buf[3], 1);
 
   return header;
 }
@@ -44,7 +44,11 @@ gst_ccnx_segment_header_unpack (const struct ccn_charbuf * header_buf)
 {
   GstCCNxSegmentHeader * header =
       (GstCCNxSegmentHeader *) malloc (sizeof(GstCCNxSegmentHeader));
-  
+
+  gst_ccnx_unpack_be_guint (&header->mSize, &header_buf->buf[0], 4);
+  gst_ccnx_unpack_be_guint (&header->mTimestamp, &header_buf->buf[4], 8);
+  gst_ccnx_unpack_be_guint (&header->mDuration, &header_buf->buf[12], 8);
+
   return header;
 }
 
@@ -86,15 +90,37 @@ gst_ccnx_segmenter_from_buffer (const GstBuffer*)
 GstBuffer*
 gst_ccnx_segmenter_to_buffer(const struct ccn_charbuf* segment, gint32& offset)
 {
+  struct ccn_charbuf * segment_hdr_buffer = NULL;
+  GstCCNxSegmentHeader * segment_hdr = NULL;
+  GstBuffer * ret = NULL;
+
   if (segment->length - offset < GST_CCNX_SEGMENT_HDR_LEN)
     return NULL;
 
-  struct ccn_charbuf * segment_header = ccn_charbuf_create ();
+  segment_hdr_buffer = ccn_charbuf_create ();
   ccn_charbuf_append (
-      segment_header, segment->buf + offset, GST_CCNX_SEGMENT_HDR_LEN);
+      segment_hdr_buffer, segment->buf + offset, GST_CCNX_SEGMENT_HDR_LEN);
+  segment_hdr = gst_ccnx_segment_header_unpack (segment_hdr_buffer);
 
-  // TODO
-  return NULL;
+  guint32 start = offset + GST_CCNX_SEGMENT_HDR_LEN;
+  guint32 end = start + segment_hdr->mSize;
+
+  if (end > segment->length)
+    goto ret_state;
+  
+  ret = gst_buffer_new ();
+  gst_buffer_set_data (ret, segment->buf + start, segment_hdr->mSize);
+  ret->timestamp = segment_hdr->mTimestamp;
+  ret->duration = segment_hdr->mDuration;
+
+  offset = end;
+
+ret_state:
+  /* clean up memory */
+  ccn_charbuf_destroy (&segment_hdr_buffer);
+  if (segment_hdr)
+    free (segment_hdr);
+  return ret;
 }
 
 void gst_ccnx_segmenter_process_buffer (
@@ -118,24 +144,26 @@ void gst_ccnx_segmenter_process_buffer_split (
 void gst_ccnx_segmenter_process_pkt (
     GstCCNxSegmenter* object, const struct ccn_charbuf* pkt_buffer)
 {
-  struct ccn_charbuf * hdr_buffer = ccn_charbuf_create ();
+  struct ccn_charbuf * hdr_buffer
+      = ccn_charbuf_create ();
   ccn_charbuf_append (hdr_buffer, pkt_buffer->buf, GST_CCNX_PACKET_HDR_LEN);
-  GstCCNxPacketHeader * header = gst_ccnx_packet_header_unpack (hdr_buffer);
-  
-  if ( !object->mPktLost || object->mPktContent->length > 0)
-    header->mOffset = 0;
+  GstCCNxPacketHeader * pkt_header
+      = gst_ccnx_packet_header_unpack (hdr_buffer);
 
-  header->mOffset += GST_CCNX_PACKET_HDR_LEN;
+  if ( !object->mPktLost || object->mPktContent->length > 0)
+    pkt_header->mOffset = 0;
+
+  pkt_header->mOffset += GST_CCNX_PACKET_HDR_LEN;
   ccn_charbuf_append (object->mPktContent, 
-                      pkt_buffer->buf + header->mOffset,
-                      pkt_buffer->length - header->mOffset);
-  object->mPktElements += header->mCount;
+                      pkt_buffer->buf + pkt_header->mOffset,
+                      pkt_buffer->length - pkt_header->mOffset);
+  object->mPktElements += pkt_header->mCount;
 
   // TODO
 
   /* clean up memory */
   ccn_charbuf_destroy (&hdr_buffer);
-  free (header);
+  free (pkt_header);
 }
 
 void gst_ccnx_segmenter_send_callback (
