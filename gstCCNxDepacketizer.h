@@ -20,7 +20,6 @@
 #ifndef __GST_CCNX_DEPACKETIZER_H__
 #define __GST_CCNX_DEPACKETIZER_H__
 
-#include <queue>
 #include <pthread.h>
 
 extern "C" {
@@ -30,8 +29,6 @@ extern "C" {
 
 #include "gstCCNxFetchBuffer.h"
 #include "gstCCNxSegmenter.h"
-
-using namespace std;
 
 const gint32 GST_CCNX_DATA_WINDOW_SIZE = 18;
 const gint32 GST_CCNX_CMD_WINDOW_SIZE = 2;
@@ -68,7 +65,7 @@ struct _GstCCNxDepacketizer {
   /* how many times to retry request */
   gint32                         mInterestRetries; 
   /* input data queue */
-  queue<GstCCNxDataQueueEntry*> *mDataQueue;
+  GQueue                        *mDataQueue;
   /* duration of the stream (in nanoseconds) */
   gint64                         mDurationNs;
   gboolean                       mRunning;
@@ -80,7 +77,7 @@ struct _GstCCNxDepacketizer {
   /* ??? */
   gint64                         mDurationLast;
   /* command queue seek in nanosecond */
-  queue<GstCCNxCmdsQueueEntry*> *mCmdsQueue;
+  GQueue                        *mCmdsQueue;
 
   struct ccn                    *mCCNx;
   struct ccn_charbuf            *mName;

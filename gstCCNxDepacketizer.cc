@@ -128,14 +128,14 @@ gst_ccnx_depkt_create (
   object->mInterestLifetime = time_out;
   object->mInterestRetries = retries;
 
-  object->mDataQueue = new queue<GstCCNxDataQueueEntry*>();
+  object->mDataQueue = g_queue_new ();
   object->mDurationNs = -1;
   object->mRunning = FALSE;
   object->mCaps = NULL;
   object->mStartTime = NULL;
   object->mSeekSegment = FALSE;
   object->mDurationLast = -1;
-  object->mCmdsQueue = new queue<GstCCNxCmdsQueueEntry*>();
+  object->mCmdsQueue = g_queue_new ();
 
   object->mCCNx = ccn_create ();
   if (ccn_connect (object->mCCNx, NULL) == -1) {
@@ -230,9 +230,8 @@ gst_ccnx_depkt_run (void* arg)
 static void
 gst_ccnx_depkt_process_cmds (GstCCNxDepacketizer *object)
 {
-  if (object->mCmdsQueue->empty ())
+  if (g_queue_is_empty (object->mCmdsQueue))
     return;
-
 }
 
 static enum ccn_upcall_res

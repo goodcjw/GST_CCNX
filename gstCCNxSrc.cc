@@ -299,7 +299,7 @@ gst_ccnx_src_create (
   }
   
   while (TRUE) {
-    if (src->mDepkt->mDataQueue->empty()) {
+    if (g_queue_is_empty (src->mDepkt->mDataQueue)) {
       if (src->mNoLocking) {
         return GST_FLOW_WRONG_STATE;
       }
@@ -310,8 +310,9 @@ gst_ccnx_src_create (
       }
     }
 
-    GstCCNxDataQueueEntry * data_entry = src->mDepkt->mDataQueue->front();
-    src->mDepkt->mDataQueue->pop();
+    GstCCNxDataQueueEntry * data_entry = 
+        (GstCCNxDataQueueEntry *) g_queue_peek_head (src->mDepkt->mDataQueue);
+    g_queue_pop_head (src->mDepkt->mDataQueue);
     
     // TODO multithreading on the queue ???
     if (src->mNoLocking)
