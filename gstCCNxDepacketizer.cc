@@ -33,9 +33,12 @@ static void gst_ccnx_depkt_fetch_start_time (GstCCNxDepacketizer *object);
 static void gst_ccnx_depkt_finish_ccnx_loop (GstCCNxDepacketizer *object);
 // TODO 
 // static void gst_ccnx_depkt_check_duration(interest);
+gboolean gst_ccnx_depkt_check_duration (GstCCNxDepacketizer *object);
+gboolean
+gst_ccnx_depkt_check_duration_initial (GstCCNxDepacketizer *object);
 
 // Bellow methods are called by thread
-static void gst_ccnx_depkt_run (GstCCNxDepacketizer *object);
+static void * gst_ccnx_depkt_run (void *object);
 static void gst_ccnx_depkt_process_cmds (GstCCNxDepacketizer *object);
 // def fetch_seek_query(self, ns):
 // def duration_process_result(self, kind, info):
@@ -44,7 +47,6 @@ static enum ccn_upcall_res gst_ccnx_depkt_duration_result (
     enum ccn_upcall_kind kind,
     struct ccn_upcall_info *info);
 
-// def check_duration(self):
 static gboolean gst_ccnx_depkt_express_interest (
     GstCCNxDepacketizer *object, gint64 seg);
 static void gst_ccnx_depkt_process_response (
@@ -63,14 +65,14 @@ static guint64 gst_ccnx_depkt_seg2num (const struct ccn_charbuf* seg);
 static void
 gst_ccnx_depkt_set_window (GstCCNxDepacketizer *object, unsigned int window)
 {
-  // TODO
-  //  object->mPipeline = 
+  object->mFetchBuffer->mWindowSize = window;
 }
 
 static void
 gst_ccnx_depkt_fetch_stream_info (GstCCNxDepacketizer *object)
 {
   // TODO
+  // self._caps = gst.caps_from_string(co.content)
 }
 
 static void
@@ -82,14 +84,16 @@ gst_ccnx_depkt_fetch_start_time (GstCCNxDepacketizer *object)
 GstCaps*
 gst_ccnx_depkt_get_caps (GstCCNxDepacketizer *object)
 {
-  // TODO
-  return NULL;
+  if (object->mCaps == NULL) {
+    gst_ccnx_depkt_fetch_stream_info (object);
+  }
+  return object->mCaps;
 }
 
 static void
 gst_ccnx_depkt_finish_ccnx_loop (GstCCNxDepacketizer *object)
 {
-  // TODO
+  ccn_set_run_timeout (object->mCCNx, 0);
 }
 
 void
@@ -99,11 +103,16 @@ gst_ccnx_depkt_seek (GstCCNxDepacketizer *object, gint64 seg_start)
 }
 
 gboolean
-gst_ccnx_depkt_check_duration_initial(GstCCNxDepacketizer *object)
+gst_ccnx_depkt_check_duration (GstCCNxDepacketizer *object)
 {
   // TODO
-  if (object == NULL)
-    return FALSE;
+  return FALSE;
+}
+
+gboolean
+gst_ccnx_depkt_check_duration_initial (GstCCNxDepacketizer *object)
+{
+  // TODO
   return FALSE;
 }
 
@@ -126,7 +135,7 @@ gst_ccnx_depkt_create (
   object->mStartTime = NULL;
   object->mSeekSegment = FALSE;
   object->mDurationLast = -1;
-  object->mCmdQueue = new queue<gint64>();
+  object->mCmdsQueue = new queue<GstCCNxCmdsQueueEntry*>();
 
   object->mCCNx = ccn_create ();
   if (ccn_connect (object->mCCNx, NULL) == -1) {
@@ -138,11 +147,14 @@ gst_ccnx_depkt_create (
   object->mName = ccn_charbuf_create ();
   object->mNameSegments = ccn_charbuf_create ();
   object->mNameFrames = ccn_charbuf_create ();
+  object->mNameStreamInfo = ccn_charbuf_create ();
   ccn_name_from_uri (object->mName, name);
   ccn_name_from_uri (object->mNameSegments, name);
   ccn_name_from_uri (object->mNameSegments, "segments");
   ccn_name_from_uri (object->mNameFrames, name);
   ccn_name_from_uri (object->mNameFrames, "index");
+  ccn_name_from_uri (object->mNameStreamInfo, name);
+  ccn_name_from_uri (object->mNameStreamInfo, "stream_info");
 
   object->mFetchBuffer = gst_ccnx_fb_create (
       object, object->mWindowSize,
@@ -162,11 +174,14 @@ gst_ccnx_depkt_destroy (GstCCNxDepacketizer ** object)
   if (depkt != NULL) {
     /* destroy dynamic allocated structs */
     ccn_destroy (&depkt->mCCNx);
-    ccn_charbuf_destroy (&depkt->mCaps);
+    // TODO check whether this is correct
+    if (depkt->mCaps != NULL)
+      gst_caps_unref (depkt->mCaps);
     ccn_charbuf_destroy (&depkt->mStartTime);
     ccn_charbuf_destroy (&depkt->mName);
     ccn_charbuf_destroy (&depkt->mNameSegments);
     ccn_charbuf_destroy (&depkt->mNameFrames);
+    ccn_charbuf_destroy (&depkt->mNameStreamInfo);
     gst_ccnx_fb_destroy (&depkt->mFetchBuffer);
     gst_ccnx_segmenter_destroy (&depkt->mSegmenter);
     /* destroy the object itself */
@@ -178,31 +193,46 @@ gst_ccnx_depkt_destroy (GstCCNxDepacketizer ** object)
 gboolean
 gst_ccnx_depkt_start (GstCCNxDepacketizer *object)
 {
-  if (object == NULL)
+  int rc;
+  rc = pthread_create (&object->mReceiverThread, NULL,
+                       gst_ccnx_depkt_run, object);
+  if (rc != 0)
     return FALSE;
-  // TODO
-  return FALSE;
+
+  object->mRunning = TRUE;
+  return TRUE;
 }
 
 gboolean
 gst_ccnx_depkt_stop (GstCCNxDepacketizer *object)
 {
-  if (object == NULL)
+  int rc;
+  object->mRunning = FALSE;
+  gst_ccnx_depkt_finish_ccnx_loop (object);
+  rc = pthread_join (object->mReceiverThread, NULL);
+  if (rc != 0)
     return FALSE;
-  // TODO
-  return FALSE;
+  return TRUE;
 }
 
-static void
-gst_ccnx_depkt_run (GstCCNxDepacketizer *object)
+static void*
+gst_ccnx_depkt_run (void* arg)
 {
-  // TODO
+  GstCCNxDepacketizer * object = (GstCCNxDepacketizer *) arg;
+  while (object->mRunning) {
+    gst_ccnx_depkt_check_duration (object);
+    ccn_run (object->mCCNx, 10000);
+    gst_ccnx_depkt_process_cmds (object);
+  }
+  return NULL;
 }
 
 static void
 gst_ccnx_depkt_process_cmds (GstCCNxDepacketizer *object)
 {
-  // TODO
+  if (object->mCmdsQueue->empty ())
+    return;
+
 }
 
 static enum ccn_upcall_res

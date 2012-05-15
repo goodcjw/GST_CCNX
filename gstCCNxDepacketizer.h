@@ -21,11 +21,11 @@
 #define __GST_CCNX_DEPACKETIZER_H__
 
 #include <queue>
+#include <pthread.h>
 
 extern "C" {
 #include <ccn/ccn.h>
 }
-
 #include <gst/gst.h>
 
 #include "gstCCNxFetchBuffer.h"
@@ -38,8 +38,8 @@ const gint32 GST_CCNX_CMD_WINDOW_SIZE = 2;
 const gint32 GST_CCNX_INTEREST_LIFETIME = 4096;
 const gint32 GST_CCNX_INTEREST_RETRIES = 1; 
 const gint32 GST_CCNX_CHUNK_SIZE = 3900;
-const gint32 GST_CCNX_FRESHNESS = 1800;  /* 30 * 60 seconds */
-const gint32 GST_CCNX_DEPKT_QUEUE_TIMEOUT = 1; /* in second */
+const gint32 GST_CCNX_FRESHNESS = 1800;           /* 30 * 60 seconds */
+const gint32 GST_CCNX_DEPKT_QUEUE_TIMEOUT = 1;    /* in second */
 
 typedef enum {
   GST_CMD_INVALID,
@@ -48,10 +48,16 @@ typedef enum {
 
 typedef struct _GstCCNxDepacketizer GstCCNxDepacketizer;
 typedef struct _GstCCNxDataQueueEntry GstCCNxDataQueueEntry;
+typedef struct _GstCCNxCmdsQueueEntry GstCCNxCmdsQueueEntry;
 
 struct _GstCCNxDataQueueEntry {
   GstCCNxCmd                     mState;
   struct ccn_charbuf            *mData;
+};
+
+struct _GstCCNxCmdsQueueEntry {
+  GstCCNxCmd                     mState;
+  gint64                         mTimestamp;
 };
 
 struct _GstCCNxDepacketizer {
@@ -67,19 +73,20 @@ struct _GstCCNxDepacketizer {
   gint64                         mDurationNs;
   gboolean                       mRunning;
   /* ? raw content of content data ? */
-  struct ccn_charbuf            *mCaps;
+  GstCaps                       *mCaps;
   /* using the signing time as video starttime */
   struct ccn_charbuf            *mStartTime;  
   gboolean                       mSeekSegment;
   /* ??? */
   gint64                         mDurationLast;
   /* command queue seek in nanosecond */
-  queue<gint64>                 *mCmdQueue;
+  queue<GstCCNxCmdsQueueEntry*> *mCmdsQueue;
 
   struct ccn                    *mCCNx;
   struct ccn_charbuf            *mName;
   struct ccn_charbuf            *mNameSegments;
   struct ccn_charbuf            *mNameFrames;
+  struct ccn_charbuf            *mNameStreamInfo;
 
   GstCCNxFetchBuffer            *mFetchBuffer;
   GstCCNxSegmenter              *mSegmenter;
@@ -87,7 +94,8 @@ struct _GstCCNxDepacketizer {
   /* self._stats = { 'srtt': 0.05, 'rttvar': 0.01 } */
   gint32                         mStatsRetries;
   gint32                         mStatsDrops;
-  
+
+  pthread_t                      mReceiverThread;
   /* 
      self._tmp_retry_requests = {}
      DurationChecker = type('DurationChecker', (pyccn.Closure,),
