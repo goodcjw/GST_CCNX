@@ -313,6 +313,7 @@ gst_ccnx_src_create (
     GstCCNxDataQueueEntry * data_entry = 
         (GstCCNxDataQueueEntry *) g_queue_peek_head (src->mDepkt->mDataQueue);
     g_queue_pop_head (src->mDepkt->mDataQueue);
+    // TODO release data_entry later !!!
     
     // TODO multithreading on the queue ???
     if (src->mNoLocking)

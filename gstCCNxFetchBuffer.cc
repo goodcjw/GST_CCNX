@@ -30,7 +30,7 @@ static void gst_ccnx_fb_push_data (GstCCNxFetchBuffer* object);
 static void
 gst_ccnx_fb_reset (GstCCNxFetchBuffer* object, gint64 position)
 {
-  object->mBuffer->clear();
+  g_hash_table_remove_all (object->mBuffer);
   object->mPosition = position;
   object->mRequested = position - 1;
   object->mCounter = 0;
@@ -42,7 +42,7 @@ static void
 gst_ccnx_fb_put (GstCCNxFetchBuffer* object, gint64 num, ContentObject* pco)
 {
   if (num >= object->mPosition) {
-    (*object->mBuffer)[num] = pco;
+    g_hash_table_insert (object->mBuffer, &num, pco);
   }
   gst_ccnx_fb_push_data (object);
 }
@@ -87,10 +87,17 @@ gst_ccnx_fb_request_data (GstCCNxFetchBuffer* object)
 static void
 gst_ccnx_fb_push_data (GstCCNxFetchBuffer* object)
 {
-  while (!object->mBuffer->empty()) {
-    ContentObject* pco = (*object->mBuffer)[object->mPosition];
-    
+  ContentObject* pco;
+  while (g_hash_table_size (object->mBuffer) != 0) {
+    pco = (ContentObject *) g_hash_table_lookup (
+        object->mBuffer, &object->mPosition);
+    /* call the callback function in GstCCNxDepacketizer */
+    object->mResponser (object->mDepkt, pco);
+    g_hash_table_remove (object->mBuffer, &object->mPosition);
+    object->mPosition += 1;
   }
+
+  gst_ccnx_fb_request_data (object);
 }
 
 /* public methods */
@@ -102,7 +109,6 @@ GstCCNxFetchBuffer * gst_ccnx_fb_create (
       (GstCCNxFetchBuffer *) malloc (sizeof(GstCCNxFetchBuffer));
 
   object->mDepkt = depkt;
-  object->mBuffer = NULL;
   object->mPosition = -1;
   object->mRequested = -1;
   object->mCounter = -1;
@@ -110,7 +116,8 @@ GstCCNxFetchBuffer * gst_ccnx_fb_create (
   object->mWindowSize = window;
   object->mRequester = req;
   object->mResponser = rep;
-  object->mBuffer = new unordered_map<gint64, ContentObject*>();
+  object->mBuffer = 
+      g_hash_table_new_full (g_int_hash, g_int_equal, NULL, free);
 
   return object;
 }
@@ -123,7 +130,7 @@ gst_ccnx_fb_destroy (GstCCNxFetchBuffer ** object)
     /* mDepkt is just a back reference, we are not going to free it */
     fb->mDepkt = NULL;
     /* destroy dynamic allocated structs */
-    delete fb->mBuffer;
+    g_hash_table_destroy (fb->mBuffer);
     /* destroy the object itself */
     free (fb);
     *object = NULL;

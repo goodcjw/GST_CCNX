@@ -45,7 +45,8 @@ struct _GstCCNxFetchBuffer {
   gst_ccnx_fb_request_cb                 mRequester;
   gst_ccnx_fb_response_cb                mResponser;
 
-  unordered_map<gint64, ContentObject*> *mBuffer;
+  /* GHashTable <gint64, ContentObject*> */
+  GHashTable                            *mBuffer;
   gint64                                 mPosition;
   gint64                                 mRequested;
   gint64                                 mCounter;
