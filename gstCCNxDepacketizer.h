@@ -108,7 +108,8 @@ gboolean gst_ccnx_depkt_start (GstCCNxDepacketizer *object);
 gboolean gst_ccnx_depkt_stop (GstCCNxDepacketizer *object);
 GstCaps* gst_ccnx_depkt_get_caps (GstCCNxDepacketizer *);
 
-gboolean gst_ccnx_depkt_check_duration_initial (GstCCNxDepacketizer *object);
+gboolean gst_ccnx_depkt_init_duration (GstCCNxDepacketizer *object);
+
 void gst_ccnx_depkt_seek (GstCCNxDepacketizer *object, gint64 seg_start);
 
 /* test functions */

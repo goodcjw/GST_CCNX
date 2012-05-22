@@ -26,21 +26,18 @@ extern "C" {
 #include "gstCCNxDepacketizer.h"
 
 static void gst_ccnx_depkt_set_window (
-    GstCCNxDepacketizer *object, unsigned int window);
-static void gst_ccnx_depkt_fetch_stream_info (GstCCNxDepacketizer *object);
-static void gst_ccnx_depkt_fetch_start_time (GstCCNxDepacketizer *object);
+    GstCCNxDepacketizer *obj, unsigned int window);
+static void gst_ccnx_depkt_fetch_stream_info (GstCCNxDepacketizer *obj);
+static void gst_ccnx_depkt_fetch_start_time (GstCCNxDepacketizer *obj);
+static gint64 gst_ccnx_depkt_fetch_seek_query ( 
+    GstCCNxDepacketizer *obj, gint64 to_seek);
 
-static void gst_ccnx_depkt_finish_ccnx_loop (GstCCNxDepacketizer *object);
-// TODO 
-// static void gst_ccnx_depkt_check_duration(interest);
-gboolean gst_ccnx_depkt_check_duration (GstCCNxDepacketizer *object);
-gboolean
-gst_ccnx_depkt_check_duration_initial (GstCCNxDepacketizer *object);
+static void gst_ccnx_depkt_finish_ccnx_loop (GstCCNxDepacketizer *obj);
+static gboolean gst_ccnx_depkt_check_duration (GstCCNxDepacketizer *obj);
 
 // Bellow methods are called by thread
-static void * gst_ccnx_depkt_run (void *object);
-static void gst_ccnx_depkt_process_cmds (GstCCNxDepacketizer *object);
-// def fetch_seek_query(self, ns):
+static void * gst_ccnx_depkt_run (void *obj);
+static void gst_ccnx_depkt_process_cmds (GstCCNxDepacketizer *obj);
 // def duration_process_result(self, kind, info):
 static enum ccn_upcall_res gst_ccnx_depkt_duration_result (
     struct ccn_closure *selfp,
@@ -48,11 +45,11 @@ static enum ccn_upcall_res gst_ccnx_depkt_duration_result (
     struct ccn_upcall_info *info);
 
 static gboolean gst_ccnx_depkt_express_interest (
-    GstCCNxDepacketizer *object, gint64 seg);
+    GstCCNxDepacketizer *obj, gint64 seg);
 static void gst_ccnx_depkt_process_response (
-    GstCCNxDepacketizer *object, ContentObject* pco);
+    GstCCNxDepacketizer *obj, ContentObject* pco);
 static void gst_ccnx_depkt_push_data (
-    GstCCNxDepacketizer *object, const GstBuffer * buf);
+    GstCCNxDepacketizer *obj, const GstBuffer * buf);
 
 static enum ccn_upcall_res gst_ccnx_depkt_upcall (
     struct ccn_closure *selfp,
@@ -63,175 +60,80 @@ static void gst_ccnx_depkt_num2seg (guint64 num, struct ccn_charbuf* seg);
 static guint64 gst_ccnx_depkt_seg2num (const struct ccn_charbuf* seg);
 
 static void
-gst_ccnx_depkt_set_window (GstCCNxDepacketizer *object, unsigned int window)
+gst_ccnx_depkt_set_window (GstCCNxDepacketizer *obj, unsigned int window)
 {
-  object->mFetchBuffer->mWindowSize = window;
+  obj->mFetchBuffer->mWindowSize = window;
 }
 
 static void
-gst_ccnx_depkt_fetch_stream_info (GstCCNxDepacketizer *object)
+gst_ccnx_depkt_fetch_stream_info (GstCCNxDepacketizer *obj)
 {
   // TODO
   // self._caps = gst.caps_from_string(co.content)
 }
 
 static void
-gst_ccnx_depkt_fetch_start_time (GstCCNxDepacketizer *object)
+gst_ccnx_depkt_fetch_start_time (GstCCNxDepacketizer *obj)
 {
   // TODO
+}
+
+static gint64
+gst_ccnx_depkt_fetch_seek_query (GstCCNxDepacketizer *obj, gint64 to_seek)
+{
+  // TODO
+  return 0;
 }
 
 GstCaps*
-gst_ccnx_depkt_get_caps (GstCCNxDepacketizer *object)
+gst_ccnx_depkt_get_caps (GstCCNxDepacketizer *obj)
 {
-  if (object->mCaps == NULL) {
-    gst_ccnx_depkt_fetch_stream_info (object);
+  if (obj->mCaps == NULL) {
+    gst_ccnx_depkt_fetch_stream_info (obj);
   }
-  return object->mCaps;
+  return obj->mCaps;
 }
 
 static void
-gst_ccnx_depkt_finish_ccnx_loop (GstCCNxDepacketizer *object)
+gst_ccnx_depkt_finish_ccnx_loop (GstCCNxDepacketizer *obj)
 {
-  ccn_set_run_timeout (object->mCCNx, 0);
+  ccn_set_run_timeout (obj->mCCNx, 0);
 }
 
-void
-gst_ccnx_depkt_seek (GstCCNxDepacketizer *object, gint64 seg_start)
-{
-  // TODO
-}
-
-gboolean
-gst_ccnx_depkt_check_duration (GstCCNxDepacketizer *object)
+static gboolean
+gst_ccnx_depkt_check_duration (GstCCNxDepacketizer *obj)
 {
   // TODO
   return FALSE;
-}
-
-gboolean
-gst_ccnx_depkt_check_duration_initial (GstCCNxDepacketizer *object)
-{
-  // TODO
-  return FALSE;
-}
-
-/* public methods */
-
-GstCCNxDepacketizer *
-gst_ccnx_depkt_create (
-    const gchar *name, gint32 window_size, gint32 time_out, gint32 retries)
-{
-  GstCCNxDepacketizer * object =
-      (GstCCNxDepacketizer *) malloc (sizeof(GstCCNxDepacketizer));
-  object->mWindowSize = window_size;
-  object->mInterestLifetime = time_out;
-  object->mInterestRetries = retries;
-
-  object->mDataQueue = g_queue_new ();
-  object->mDurationNs = -1;
-  object->mRunning = FALSE;
-  object->mCaps = NULL;
-  object->mStartTime = NULL;
-  object->mSeekSegment = FALSE;
-  object->mDurationLast = -1;
-  object->mCmdsQueue = g_queue_new ();
-
-  object->mCCNx = ccn_create ();
-  if (ccn_connect (object->mCCNx, NULL) == -1) {
-    // TODO log warning
-    gst_ccnx_depkt_destroy (&object);
-    return NULL;
-  }
-  
-  object->mName = ccn_charbuf_create ();
-  object->mNameSegments = ccn_charbuf_create ();
-  object->mNameFrames = ccn_charbuf_create ();
-  object->mNameStreamInfo = ccn_charbuf_create ();
-  ccn_name_from_uri (object->mName, name);
-  ccn_name_from_uri (object->mNameSegments, name);
-  ccn_name_from_uri (object->mNameSegments, "segments");
-  ccn_name_from_uri (object->mNameFrames, name);
-  ccn_name_from_uri (object->mNameFrames, "index");
-  ccn_name_from_uri (object->mNameStreamInfo, name);
-  ccn_name_from_uri (object->mNameStreamInfo, "stream_info");
-
-  object->mFetchBuffer = gst_ccnx_fb_create (
-      object, object->mWindowSize,
-      gst_ccnx_depkt_express_interest,
-      gst_ccnx_depkt_process_response);
-
-  object->mSegmenter = gst_ccnx_segmenter_create (
-      object, gst_ccnx_depkt_push_data, GST_CCNX_CHUNK_SIZE);
-
-  return object;
-}
-
-void
-gst_ccnx_depkt_destroy (GstCCNxDepacketizer ** object)
-{
-  GstCCNxDepacketizer * depkt = *object;
-  if (depkt != NULL) {
-    /* destroy dynamic allocated structs */
-    ccn_destroy (&depkt->mCCNx);
-    // TODO check whether this is correct
-    if (depkt->mCaps != NULL)
-      gst_caps_unref (depkt->mCaps);
-    ccn_charbuf_destroy (&depkt->mStartTime);
-    ccn_charbuf_destroy (&depkt->mName);
-    ccn_charbuf_destroy (&depkt->mNameSegments);
-    ccn_charbuf_destroy (&depkt->mNameFrames);
-    ccn_charbuf_destroy (&depkt->mNameStreamInfo);
-    gst_ccnx_fb_destroy (&depkt->mFetchBuffer);
-    gst_ccnx_segmenter_destroy (&depkt->mSegmenter);
-    /* destroy the object itself */
-    free (depkt);
-    *object = NULL;
-  }
-}
-
-gboolean
-gst_ccnx_depkt_start (GstCCNxDepacketizer *object)
-{
-  int rc;
-  rc = pthread_create (&object->mReceiverThread, NULL,
-                       gst_ccnx_depkt_run, object);
-  if (rc != 0)
-    return FALSE;
-
-  object->mRunning = TRUE;
-  return TRUE;
-}
-
-gboolean
-gst_ccnx_depkt_stop (GstCCNxDepacketizer *object)
-{
-  int rc;
-  object->mRunning = FALSE;
-  gst_ccnx_depkt_finish_ccnx_loop (object);
-  rc = pthread_join (object->mReceiverThread, NULL);
-  if (rc != 0)
-    return FALSE;
-  return TRUE;
 }
 
 static void*
 gst_ccnx_depkt_run (void* arg)
 {
-  GstCCNxDepacketizer * object = (GstCCNxDepacketizer *) arg;
-  while (object->mRunning) {
-    gst_ccnx_depkt_check_duration (object);
-    ccn_run (object->mCCNx, 10000);
-    gst_ccnx_depkt_process_cmds (object);
+  GstCCNxDepacketizer * obj = (GstCCNxDepacketizer *) arg;
+  while (obj->mRunning) {
+    gst_ccnx_depkt_check_duration (obj);
+    ccn_run (obj->mCCNx, 10000);
+    gst_ccnx_depkt_process_cmds (obj);
   }
   return NULL;
 }
 
 static void
-gst_ccnx_depkt_process_cmds (GstCCNxDepacketizer *object)
+gst_ccnx_depkt_process_cmds (GstCCNxDepacketizer *obj)
 {
-  if (g_queue_is_empty (object->mCmdsQueue))
+  if (g_queue_is_empty (obj->mCmdsQueue))
     return;
+
+  GstCCNxCmdsQueueEntry * cmds_entry
+      = (GstCCNxCmdsQueueEntry *) g_queue_pop_tail (obj->mCmdsQueue);
+
+  if (cmds_entry->mState == GST_CMD_SEEK) {
+    gint64 to_seek = gst_ccnx_depkt_fetch_seek_query (obj, to_seek);
+    obj->mSeekSegment = TRUE;
+    gst_ccnx_segmenter_pkt_lost (obj->mSegmenter);
+    // FIXME _cmd_q.task_done ()
+  }
 }
 
 static enum ccn_upcall_res
@@ -245,7 +147,7 @@ gst_ccnx_depkt_duration_result (
 }
 
 static gboolean
-gst_ccnx_depkt_express_interest (GstCCNxDepacketizer *object, gint64 seg)
+gst_ccnx_depkt_express_interest (GstCCNxDepacketizer *obj, gint64 seg)
 {
   // TODO
   // mNameSegments
@@ -253,15 +155,18 @@ gst_ccnx_depkt_express_interest (GstCCNxDepacketizer *object, gint64 seg)
 }
 
 static void
-gst_ccnx_depkt_process_response (
-    GstCCNxDepacketizer *object, ContentObject* pco)
+gst_ccnx_depkt_process_response (GstCCNxDepacketizer *obj, ContentObject* pco)
 {
+  if (pco == NULL) {
+    gst_ccnx_segmenter_pkt_lost (obj->mSegmenter);
+    return;
+  }
   // TODO
+  gst_ccnx_segmenter_process_pkt (obj->mSegmenter, NULL); // FIXME: NULL
 }
 
 static void
-gst_ccnx_depkt_push_data (
-    GstCCNxDepacketizer *object, const GstBuffer * buf)
+gst_ccnx_depkt_push_data (GstCCNxDepacketizer *obj, const GstBuffer * buf)
 {
   // TODO
 }
@@ -300,6 +205,134 @@ gst_ccnx_depkt_num2seg (guint64 num, struct ccn_charbuf* seg)
     seg->buf[i] = seg->buf[seg->length - i - 1];
     seg->buf[seg->length - i - 1] = aByte;
   }
+}
+
+/* public methods */
+
+GstCCNxDepacketizer *
+gst_ccnx_depkt_create (
+    const gchar *name, gint32 window_size, gint32 time_out, gint32 retries)
+{
+  GstCCNxDepacketizer * obj =
+      (GstCCNxDepacketizer *) malloc (sizeof(GstCCNxDepacketizer));
+  obj->mWindowSize = window_size;
+  obj->mInterestLifetime = time_out;
+  obj->mInterestRetries = retries;
+
+  obj->mDataQueue = g_queue_new ();
+  obj->mDurationNs = -1;
+  obj->mRunning = FALSE;
+  obj->mCaps = NULL;
+  obj->mStartTime = NULL;
+  obj->mSeekSegment = FALSE;
+  obj->mDurationLast = -1;
+  obj->mCmdsQueue = g_queue_new ();
+
+  obj->mCCNx = ccn_create ();
+  if (ccn_connect (obj->mCCNx, NULL) == -1) {
+    /* LOG: cannot connect to CCN */
+    gst_ccnx_depkt_destroy (&obj);
+    return NULL;
+  }
+  
+  obj->mName = ccn_charbuf_create ();
+  obj->mNameSegments = ccn_charbuf_create ();
+  obj->mNameFrames = ccn_charbuf_create ();
+  obj->mNameStreamInfo = ccn_charbuf_create ();
+  ccn_name_from_uri (obj->mName, name);
+  ccn_name_from_uri (obj->mNameSegments, name);
+  ccn_name_from_uri (obj->mNameSegments, "segments");
+  ccn_name_from_uri (obj->mNameFrames, name);
+  ccn_name_from_uri (obj->mNameFrames, "index");
+  ccn_name_from_uri (obj->mNameStreamInfo, name);
+  ccn_name_from_uri (obj->mNameStreamInfo, "stream_info");
+
+  obj->mFetchBuffer = gst_ccnx_fb_create (
+      obj, obj->mWindowSize,
+      gst_ccnx_depkt_express_interest,
+      gst_ccnx_depkt_process_response);
+
+  obj->mSegmenter = gst_ccnx_segmenter_create (
+      obj, gst_ccnx_depkt_push_data, GST_CCNX_CHUNK_SIZE);
+
+  return obj;
+}
+
+void
+gst_ccnx_depkt_destroy (GstCCNxDepacketizer ** obj)
+{
+  GstCCNxDepacketizer * depkt = *obj;
+  GstCCNxDataQueueEntry * data_entry;
+  GstCCNxCmdsQueueEntry * cmds_entry;
+
+  if (depkt != NULL) {
+    /* destroy data queue and cmds queue */
+    while ((data_entry = (GstCCNxDataQueueEntry *) g_queue_pop_tail (
+               depkt->mDataQueue)) != NULL)
+      free (data_entry);
+    while ((cmds_entry = (GstCCNxCmdsQueueEntry *) g_queue_pop_tail (
+               depkt->mCmdsQueue)) != NULL)
+      free (cmds_entry);
+
+    /* destroy dynamic allocated structs */
+    ccn_destroy (&depkt->mCCNx);
+    // FIXME check whether this is correct
+    if (depkt->mCaps != NULL)
+      gst_caps_unref (depkt->mCaps);
+    ccn_charbuf_destroy (&depkt->mStartTime);
+    ccn_charbuf_destroy (&depkt->mName);
+    ccn_charbuf_destroy (&depkt->mNameSegments);
+    ccn_charbuf_destroy (&depkt->mNameFrames);
+    ccn_charbuf_destroy (&depkt->mNameStreamInfo);
+    gst_ccnx_fb_destroy (&depkt->mFetchBuffer);
+    gst_ccnx_segmenter_destroy (&depkt->mSegmenter);
+    /* destroy the object itself */
+    free (depkt);
+    *obj = NULL;
+  }
+}
+
+gboolean
+gst_ccnx_depkt_start (GstCCNxDepacketizer *obj)
+{
+  int rc;
+  rc = pthread_create (&obj->mReceiverThread, NULL,
+                       gst_ccnx_depkt_run, obj);
+  if (rc != 0)
+    return FALSE;
+
+  obj->mRunning = TRUE;
+  return TRUE;
+}
+
+gboolean
+gst_ccnx_depkt_stop (GstCCNxDepacketizer *obj)
+{
+  int rc;
+  obj->mRunning = FALSE;
+  gst_ccnx_depkt_finish_ccnx_loop (obj);
+  rc = pthread_join (obj->mReceiverThread, NULL);
+  if (rc != 0)
+    return FALSE;
+  return TRUE;
+}
+
+gboolean
+gst_ccnx_depkt_init_duration (GstCCNxDepacketizer *obj)
+{
+  // TODO
+  return FALSE;
+}
+
+void
+gst_ccnx_depkt_seek (GstCCNxDepacketizer *obj, gint64 seg_start)
+{
+  GstCCNxCmdsQueueEntry * cmds_entry =
+      (GstCCNxCmdsQueueEntry *) malloc (sizeof(GstCCNxCmdsQueueEntry));
+  cmds_entry->mState = GST_CMD_SEEK;
+  cmds_entry->mTimestamp = seg_start;
+  g_queue_push_head (obj->mCmdsQueue, cmds_entry);
+  gst_ccnx_depkt_finish_ccnx_loop (obj);
 }
 
 /* test functions */

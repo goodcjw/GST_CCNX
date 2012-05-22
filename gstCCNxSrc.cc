@@ -311,8 +311,8 @@ gst_ccnx_src_create (
     }
 
     GstCCNxDataQueueEntry * data_entry = 
-        (GstCCNxDataQueueEntry *) g_queue_peek_head (src->mDepkt->mDataQueue);
-    g_queue_pop_head (src->mDepkt->mDataQueue);
+        (GstCCNxDataQueueEntry *) g_queue_peek_tail (src->mDepkt->mDataQueue);
+    g_queue_pop_tail (src->mDepkt->mDataQueue);
     // TODO release data_entry later !!!
     
     // TODO multithreading on the queue ???
@@ -386,7 +386,7 @@ static gboolean
 gst_ccnx_src_query_duration (GstCCNxSrc * src)
 {
   if (src->mDepkt)
-    return gst_ccnx_depkt_check_duration_initial(src->mDepkt);
+    return gst_ccnx_depkt_init_duration (src->mDepkt);
 
   return FALSE;
 }

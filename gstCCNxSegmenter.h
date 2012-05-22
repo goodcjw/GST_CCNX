@@ -36,7 +36,7 @@ typedef struct _GstCCNxPacketHeader GstCCNxPacketHeader;
 typedef struct _GstCCNxSegmentHeader GstCCNxSegmentHeader;
 
 typedef void (*gst_ccnx_seg_callback) (
-    GstCCNxDepacketizer *object, const GstBuffer * buf);
+    GstCCNxDepacketizer *obj, const GstBuffer * buf);
 
 struct _GstCCNxSegmenter {
   GstCCNxDepacketizer          *mDepkt;
@@ -61,7 +61,16 @@ struct _GstCCNxSegmentHeader {
 };
 
 GstCCNxSegmenter * gst_ccnx_segmenter_create (
-    GstCCNxDepacketizer * depkt, gst_ccnx_seg_callback func, guint32 max_size);
-void gst_ccnx_segmenter_destroy (GstCCNxSegmenter ** object);
+    GstCCNxDepacketizer *       depkt,
+    gst_ccnx_seg_callback       func,
+    guint32                     max_size);
+
+void gst_ccnx_segmenter_destroy (GstCCNxSegmenter ** obj);
+
+void gst_ccnx_segmenter_pkt_lost (GstCCNxSegmenter* obj);
+
+void gst_ccnx_segmenter_process_pkt (
+    GstCCNxSegmenter*           obj, 
+    const struct ccn_charbuf*   pkt_buffer);
 
 #endif // __GST_CCNX_SEGMENTER_H__

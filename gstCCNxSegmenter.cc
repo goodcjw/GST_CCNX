@@ -29,9 +29,6 @@ GstCCNxSegmentHeader* gst_ccnx_segment_header_unpack (
 /* convertor bettwen GstBuffer and CCNx segment */
 GstBuffer* gst_ccnx_segmenter_to_buffer (
     const struct ccn_charbuf * segment, gint32& offset);
-void gst_ccnx_segmenter_pkt_lost (GstCCNxSegmenter* object);
-void gst_ccnx_segmenter_process_pkt (
-    GstCCNxSegmenter* object, const struct ccn_charbuf* pkt_buffer);
 
 GstCCNxPacketHeader * 
 gst_ccnx_packet_header_unpack (const struct ccn_charbuf * header_buf)
@@ -57,18 +54,6 @@ gst_ccnx_segment_header_unpack (const struct ccn_charbuf * header_buf)
   gst_ccnx_unpack_be_guint (&header->mDuration, &header_buf->buf[12], 8);
 
   return header;
-}
-
-void gst_ccnx_segmenter_pkt_lost (GstCCNxSegmenter* object)
-{
-  object->mPktLost = TRUE;
-  
-  if (object->mPktContent == NULL)
-    object->mPktContent = ccn_charbuf_create();
-  else
-    ccn_charbuf_reset(object->mPktContent);
-  
-  object->mPktElements = 0;
 }
 
 GstBuffer*
@@ -107,8 +92,55 @@ ret_state:
   return ret;
 }
 
+/* public methods */
+
+GstCCNxSegmenter *
+gst_ccnx_segmenter_create (
+    GstCCNxDepacketizer * depkt, gst_ccnx_seg_callback func, guint32 max_size)
+{
+  GstCCNxSegmenter * obj =
+      (GstCCNxSegmenter*) malloc (sizeof(GstCCNxSegmenter));
+
+  obj->mDepkt = depkt;
+  obj->mCallback = func;
+  obj->mMaxSize = max_size - GST_CCNX_PACKET_HDR_LEN;
+  obj->mPktContent = ccn_charbuf_create();
+  obj->mPktElements = 0;
+  obj->mPktElementOff = 0;
+  obj->mPktLost = FALSE;
+
+  return obj;
+}
+
+void
+gst_ccnx_segmenter_destroy (GstCCNxSegmenter ** obj)
+{
+  GstCCNxSegmenter * seg = *obj;
+  if (seg != NULL) {
+    /* mDepkt is just a back reference, we are not going to free it */
+    seg->mDepkt = NULL;
+    /* destroy dynamic allocated structs */
+    ccn_charbuf_destroy (&seg->mPktContent);
+    /* destroy the obj itself */
+    free (seg);
+    *obj = NULL;
+  }
+}
+
+void gst_ccnx_segmenter_pkt_lost (GstCCNxSegmenter* obj)
+{
+  obj->mPktLost = TRUE;
+  
+  if (obj->mPktContent == NULL)
+    obj->mPktContent = ccn_charbuf_create();
+  else
+    ccn_charbuf_reset(obj->mPktContent);
+  
+  obj->mPktElements = 0;
+}
+
 void gst_ccnx_segmenter_process_pkt (
-    GstCCNxSegmenter* object, const struct ccn_charbuf* pkt_buffer)
+    GstCCNxSegmenter* obj, const struct ccn_charbuf* pkt_buffer)
 {
   struct ccn_charbuf * hdr_buffer = NULL;
   GstCCNxPacketHeader * pkt_header = NULL;
@@ -119,68 +151,34 @@ void gst_ccnx_segmenter_process_pkt (
 
   pkt_header = gst_ccnx_packet_header_unpack (hdr_buffer);
 
-  if ( !object->mPktLost || object->mPktContent->length > 0)
+  if ( !obj->mPktLost || obj->mPktContent->length > 0)
     pkt_header->mOffset = 0;
 
   pkt_header->mOffset += GST_CCNX_PACKET_HDR_LEN;
-  ccn_charbuf_append (object->mPktContent, 
+  ccn_charbuf_append (obj->mPktContent, 
                       pkt_buffer->buf + pkt_header->mOffset,
                       pkt_buffer->length - pkt_header->mOffset);
-  object->mPktElements += pkt_header->mCount;
+  obj->mPktElements += pkt_header->mCount;
 
   gint32 off = 0;
-  while (object->mPktElements > 0) {
-    buf = gst_ccnx_segmenter_to_buffer (object->mPktContent, off);
+  while (obj->mPktElements > 0) {
+    buf = gst_ccnx_segmenter_to_buffer (obj->mPktContent, off);
 
     if (buf == NULL)
       break;
 
-    if (object->mPktLost) {
+    if (obj->mPktLost) {
       GST_BUFFER_FLAG_SET (buf, GST_BUFFER_FLAG_DISCONT);
-      object->mPktLost = FALSE;
+      obj->mPktLost = FALSE;
     }
 
-    object->mCallback (object->mDepkt, buf);
-    object->mPktElements -= 1;
+    obj->mCallback (obj->mDepkt, buf);
+    obj->mPktElements -= 1;
   }
-  assert ((pkt_header->mLeft > 0 && object->mPktElements == 1) || 
-          object->mPktElements == 0);
+  assert ((pkt_header->mLeft > 0 && obj->mPktElements == 1) || 
+          obj->mPktElements == 0);
 
   /* clean up memory */
   ccn_charbuf_destroy (&hdr_buffer);
   free (pkt_header);
-}
-
-/* public methods */
-GstCCNxSegmenter *
-gst_ccnx_segmenter_create (
-    GstCCNxDepacketizer * depkt, gst_ccnx_seg_callback func, guint32 max_size)
-{
-  GstCCNxSegmenter * object =
-      (GstCCNxSegmenter*) malloc (sizeof(GstCCNxSegmenter));
-
-  object->mDepkt = depkt;
-  object->mCallback = func;
-  object->mMaxSize = max_size - GST_CCNX_PACKET_HDR_LEN;
-  object->mPktContent = ccn_charbuf_create();
-  object->mPktElements = 0;
-  object->mPktElementOff = 0;
-  object->mPktLost = FALSE;
-
-  return object;
-}
-
-void
-gst_ccnx_segmenter_destroy (GstCCNxSegmenter ** object)
-{
-  GstCCNxSegmenter * seg = *object;
-  if (seg != NULL) {
-    /* mDepkt is just a back reference, we are not going to free it */
-    seg->mDepkt = NULL;
-    /* destroy dynamic allocated structs */
-    ccn_charbuf_destroy (&seg->mPktContent);
-    /* destroy the object itself */
-    free (seg);
-    *object = NULL;
-  }
 }

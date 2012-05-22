@@ -42,7 +42,8 @@ static void
 gst_ccnx_fb_put (GstCCNxFetchBuffer* object, gint64 num, ContentObject* pco)
 {
   if (num >= object->mPosition) {
-    g_hash_table_insert (object->mBuffer, &num, pco);
+    gint64 * p_num = (gint64 *) malloc (sizeof(gint64));
+    g_hash_table_insert (object->mBuffer, p_num, pco);
   }
   gst_ccnx_fb_push_data (object);
 }
