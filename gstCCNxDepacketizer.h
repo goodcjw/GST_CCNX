@@ -37,6 +37,7 @@ const gint32 GST_CCNX_INTEREST_RETRIES = 1;
 const gint32 GST_CCNX_CHUNK_SIZE = 3900;
 const gint32 GST_CCNX_FRESHNESS = 1800;           /* 30 * 60 seconds */
 const gint32 GST_CCNX_DEPKT_QUEUE_TIMEOUT = 1;    /* in second */
+const gint32 GST_CCNX_CCN_GET_TIMEOUT = 1000;     /* 1000 ms */
 
 typedef enum {
   GST_CMD_INVALID,
@@ -71,11 +72,11 @@ struct _GstCCNxDepacketizer {
   gboolean                       mRunning;
   /* ? raw content of content data ? */
   GstCaps                       *mCaps;
-  /* using the signing time as video starttime */
-  struct ccn_charbuf            *mStartTime;  
+  /* using the signing time as video starttime, normal UNIX timestamp */
+  gint32                         mStartTime;  
   gboolean                       mSeekSegment;
   /* ??? */
-  gint64                         mDurationLast;
+  struct ccn_charbuf            *mDurationLast;
   /* command queue seek in nanosecond */
   GQueue                        *mCmdsQueue;
 
@@ -83,7 +84,6 @@ struct _GstCCNxDepacketizer {
   struct ccn_charbuf            *mName;
   struct ccn_charbuf            *mNameSegments;
   struct ccn_charbuf            *mNameFrames;
-  struct ccn_charbuf            *mNameStreamInfo;
 
   GstCCNxFetchBuffer            *mFetchBuffer;
   GstCCNxSegmenter              *mSegmenter;

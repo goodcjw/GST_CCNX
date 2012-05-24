@@ -20,16 +20,14 @@
 #ifndef __GST_CCNX_FETCH_BUFFER_H__
 #define __GST_CCNX_FETCH_BUFFER_H__
 
-#include <tr1/unordered_map>
 #include <gst/gst.h>
 
-using namespace std::tr1;
+#include "gstCCNxUtils.h"
 
 const gint64 GST_CCNX_COUNTER_STEP = 10;
 
 struct _GstCCNxDepacketizer;
 
-typedef struct ccn_parsed_ContentObject ContentObject;
 typedef struct _GstCCNxDepacketizer GstCCNxDepacketizer; 
 typedef struct _GstCCNxFetchBuffer GstCCNxFetchBuffer;
 typedef gboolean (*gst_ccnx_fb_request_cb) (
