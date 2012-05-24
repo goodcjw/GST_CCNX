@@ -30,10 +30,18 @@ struct _GstCCNxDepacketizer;
 
 typedef struct _GstCCNxDepacketizer GstCCNxDepacketizer; 
 typedef struct _GstCCNxFetchBuffer GstCCNxFetchBuffer;
+
 typedef gboolean (*gst_ccnx_fb_request_cb) (
     GstCCNxDepacketizer *object, gint64 seg);
 typedef void (*gst_ccnx_fb_response_cb) (
-    GstCCNxDepacketizer *object, ContentObject* data);
+    GstCCNxDepacketizer *object, struct ccn_charbuf *buf, ContentObject *data);
+
+typedef struct _GstCCNxFBEntry GstCCNxFBEntry;
+
+struct _GstCCNxFBEntry {
+  struct ccn_charbuf * buf;
+  ContentObject * pco;
+};
 
 struct _GstCCNxFetchBuffer {
   /* just a back reference, not created here */

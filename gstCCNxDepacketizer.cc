@@ -47,7 +47,7 @@ static enum ccn_upcall_res gst_ccnx_depkt_duration_result (
 static gboolean gst_ccnx_depkt_express_interest (
     GstCCNxDepacketizer *obj, gint64 seg);
 static void gst_ccnx_depkt_process_response (
-    GstCCNxDepacketizer *obj, ContentObject* pco);
+    GstCCNxDepacketizer *obj, struct ccn_charbuf *buf, ContentObject* pco);
 static void gst_ccnx_depkt_push_data (
     GstCCNxDepacketizer *obj, const GstBuffer * buf);
 
@@ -223,8 +223,10 @@ gst_ccnx_depkt_express_interest (GstCCNxDepacketizer *obj, gint64 seg)
 }
 
 static void
-gst_ccnx_depkt_process_response (GstCCNxDepacketizer *obj, ContentObject* pco)
+gst_ccnx_depkt_process_response (
+    GstCCNxDepacketizer *obj, struct ccn_charbuf *buf, ContentObject* pco)
 {
+  /* when this function returns, buf and pco will be released immediately */
   if (pco == NULL) {
     gst_ccnx_segmenter_pkt_lost (obj->mSegmenter);
     return;

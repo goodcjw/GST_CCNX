@@ -17,15 +17,19 @@
  * Boston, MA 02111-1307, USA.
  */
 
+extern "C" {
+#include <ccn/charbuf.h>
+}
 #include "gstCCNxFetchBuffer.h"
 
 static void gst_ccnx_fb_reset (GstCCNxFetchBuffer* object, gint64 position);
-static void gst_ccnx_fb_put (
-    GstCCNxFetchBuffer* object, gint64 num, ContentObject* pco);
+static void gst_ccnx_fb_put (GstCCNxFetchBuffer* object, gint64 num,
+                             struct ccn_charbuf *buf, ContentObject * pco);
 static void gst_ccnx_fb_timeout (GstCCNxFetchBuffer* object, gint64 num);
 static gint64 gst_ccnx_fb_get_size (GstCCNxFetchBuffer* object);
 static void gst_ccnx_fb_request_data (GstCCNxFetchBuffer* object);
 static void gst_ccnx_fb_push_data (GstCCNxFetchBuffer* object);
+static void gst_ccnx_fb_entry_destroy (void * object);
 
 static void
 gst_ccnx_fb_reset (GstCCNxFetchBuffer* object, gint64 position)
@@ -38,12 +42,22 @@ gst_ccnx_fb_reset (GstCCNxFetchBuffer* object, gint64 position)
   gst_ccnx_fb_request_data (object);
 }
 
+/*
+ * once buf and pco been put into the buffer, we are subject to be destroyed
+ * when its corresponding entry is removed from the buffer
+ */
 static void
-gst_ccnx_fb_put (GstCCNxFetchBuffer* object, gint64 num, ContentObject* pco)
+gst_ccnx_fb_put (GstCCNxFetchBuffer* object, gint64 num,
+                 struct ccn_charbuf *buf, ContentObject * pco)
 {
   if (num >= object->mPosition) {
     gint64 * p_num = (gint64 *) malloc (sizeof(gint64));
-    g_hash_table_insert (object->mBuffer, p_num, pco);
+    GstCCNxFBEntry * p_entry = 
+        (GstCCNxFBEntry *) malloc (sizeof(GstCCNxFBEntry));
+    *p_num = num;
+    p_entry->buf = buf;
+    p_entry->pco = pco;
+    g_hash_table_insert (object->mBuffer, p_num, p_entry);
   }
   gst_ccnx_fb_push_data (object);
 }
@@ -51,7 +65,7 @@ gst_ccnx_fb_put (GstCCNxFetchBuffer* object, gint64 num, ContentObject* pco)
 static void
 gst_ccnx_fb_timeout (GstCCNxFetchBuffer* object, gint64 num)
 {
-  gst_ccnx_fb_put (object, num, NULL);
+  gst_ccnx_fb_put (object, num, NULL, NULL);
 }
 
 static gint64
@@ -88,12 +102,13 @@ gst_ccnx_fb_request_data (GstCCNxFetchBuffer* object)
 static void
 gst_ccnx_fb_push_data (GstCCNxFetchBuffer* object)
 {
-  ContentObject* pco;
+  GstCCNxFBEntry * entry;
   while (g_hash_table_size (object->mBuffer) != 0) {
-    pco = (ContentObject *) g_hash_table_lookup (
+    entry = (GstCCNxFBEntry *) g_hash_table_lookup (
         object->mBuffer, &object->mPosition);
     /* call the callback function in GstCCNxDepacketizer */
-    object->mResponser (object->mDepkt, pco);
+    object->mResponser (object->mDepkt, entry->buf, entry->pco);
+    /* buf and pco will be release at this point */
     g_hash_table_remove (object->mBuffer, &object->mPosition);
     object->mPosition += 1;
   }
@@ -118,7 +133,8 @@ GstCCNxFetchBuffer * gst_ccnx_fb_create (
   object->mRequester = req;
   object->mResponser = rep;
   object->mBuffer = 
-      g_hash_table_new_full (g_int_hash, g_int_equal, NULL, free);
+      g_hash_table_new_full (g_int_hash, g_int_equal, 
+                             free, gst_ccnx_fb_entry_destroy);
 
   return object;
 }
@@ -135,5 +151,17 @@ gst_ccnx_fb_destroy (GstCCNxFetchBuffer ** object)
     /* destroy the object itself */
     free (fb);
     *object = NULL;
+  }
+}
+
+static void
+gst_ccnx_fb_entry_destroy (void *obj)
+{
+  GstCCNxFBEntry * entry = * (GstCCNxFBEntry**) obj;
+
+  if (entry != NULL) {
+    ccn_charbuf_destroy (&entry->buf);
+    if (entry->pco != NULL)
+      free (entry->pco);
   }
 }
