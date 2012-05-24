@@ -34,6 +34,7 @@ static gint64 gst_ccnx_depkt_fetch_seek_query (
 
 static void gst_ccnx_depkt_finish_ccnx_loop (GstCCNxDepacketizer *obj);
 static gboolean gst_ccnx_depkt_check_duration (GstCCNxDepacketizer *obj);
+// TODO: def __check_duration(self, interest):
 
 // Bellow methods are called by thread
 static void * gst_ccnx_depkt_run (void *obj);
@@ -224,16 +225,17 @@ gst_ccnx_depkt_express_interest (GstCCNxDepacketizer *obj, gint64 seg)
 
 static void
 gst_ccnx_depkt_process_response (
-    GstCCNxDepacketizer *obj, struct ccn_charbuf *buf, ContentObject* pco)
+    GstCCNxDepacketizer *obj, struct ccn_charbuf * buf, ContentObject * pco)
 {
   /* when this function returns, buf and pco will be released immediately */
+  struct ccn_charbuf * content;
   if (pco == NULL) {
     gst_ccnx_segmenter_pkt_lost (obj->mSegmenter);
     return;
   }
-  // TODO
-  // NULL shall be ccn_charbuf
-  gst_ccnx_segmenter_process_pkt (obj->mSegmenter, NULL); // FIXME: NULL
+  content = gst_ccnx_utils_get_content (buf, pco);
+  /* now we get the content, hopefully, we don't need buf and pco anymore */
+  gst_ccnx_segmenter_process_pkt (obj->mSegmenter, content);
 }
 
 static void

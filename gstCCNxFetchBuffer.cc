@@ -160,6 +160,7 @@ gst_ccnx_fb_entry_destroy (void *obj)
   GstCCNxFBEntry * entry = * (GstCCNxFBEntry**) obj;
 
   if (entry != NULL) {
+    /* FIXME shall we destroy these values here ? */
     ccn_charbuf_destroy (&entry->buf);
     if (entry->pco != NULL)
       free (entry->pco);
