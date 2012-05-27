@@ -49,4 +49,10 @@ gst_ccnx_utils_get_timestamp (
  */
 void gst_ccnx_utils_append_exclude_any (struct ccn_charbuf *c);
 
+struct ccn_charbuf * 
+gst_ccnx_utils_get_name (const unsigned char *content, ContentObject *pco);
+
+struct ccn_charbuf * 
+gst_ccnx_utils_get_last_comp_from_name (const struct ccn_charbuf *name);
+
 #endif // __GST_CCNX_UTILS_H__

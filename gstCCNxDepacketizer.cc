@@ -123,7 +123,6 @@ static gint64
 gst_ccnx_depkt_fetch_seek_query (GstCCNxDepacketizer *obj, guint64 *idxNum)
 {
   gint r;
-  size_t retNameSize, idxPosition;
   guint64 segNum;
   struct ccn_charbuf *idxName = NULL;
   struct ccn_charbuf *comp = NULL;  /* used to represent an entry to exclude */
@@ -183,29 +182,18 @@ gst_ccnx_depkt_fetch_seek_query (GstCCNxDepacketizer *obj, guint64 *idxNum)
   }
 
   /* get the real index returned with content */
-  retNameSize = pcoBuffer->offset[CCN_PCO_B_Name] -
-      pcoBuffer->offset[CCN_PCO_E_Name];
-  retName = ccn_charbuf_create ();
-  ccn_uri_append (retName, retBuffer->buf, retNameSize, 1);
-
-  idxName = ccn_charbuf_create ();
-  for (idxPosition = retName->length - 1;
-       retName->buf[idxPosition] != '/';
-       idxPosition--);
-  idxPosition++;
-  ccn_charbuf_append (idxName, &retName->buf[idxPosition], 
-                      retName->length - idxPosition);
-  *idxNum = gst_ccnx_depkt_seg2num (idxName);
+  retName = gst_ccnx_utils_get_name (retBuffer->buf, pcoBuffer);
+  idxName = gst_ccnx_utils_get_last_comp_from_name (retName);
 
   /* get the content of this packet as segNum */
   contentBuffer = gst_ccnx_utils_get_content (retBuffer->buf, pcoBuffer);
   if (contentBuffer != NULL && contentBuffer->length > 0) {
     segNum = strtoul (ccn_charbuf_as_string (contentBuffer), NULL, 10);
   }
-  // return (self.index2ts(index), segment)
 
   ccn_charbuf_destroy (&templ);
   ccn_charbuf_destroy (&retName);
+  ccn_charbuf_destroy (&idxName);
   ccn_charbuf_destroy (&retBuffer);
   ccn_charbuf_destroy (&contentBuffer);
   if (pcoBuffer != NULL)
@@ -278,7 +266,7 @@ gst_ccnx_depkt_duration_result (
 
   GstCCNxDepacketizer *obj = (GstCCNxDepacketizer *) selfp->data;
   struct ccn_charbuf *name;
-  size_t len, last;
+  size_t last;
 
   if (kind == CCN_UPCALL_FINAL)
     return CCN_UPCALL_RESULT_OK;
@@ -288,14 +276,9 @@ gst_ccnx_depkt_duration_result (
     return CCN_UPCALL_RESULT_ERR;
 
   if (kind == CCN_UPCALL_CONTENT) {
-    len = info->pco->offset[CCN_PCO_B_Name] - info->pco->offset[CCN_PCO_B_Name];
-    name = ccn_charbuf_create ();
-    obj->mDurationLast = ccn_charbuf_create ();
-    ccn_uri_append (name, info->content_ccnb, len, 0);
-    for (last = name->length - 1; name->buf[last] != '/'; last--);
-    ccn_charbuf_append (obj->mDurationLast,
-                        &name->buf[last + 1],
-                        name->length - last);
+    /* get the name of returned content and store its last component */
+    name = gst_ccnx_utils_get_name (info->content_ccnb, info->pco);
+    obj->mDurationLast = gst_ccnx_utils_get_last_comp_from_name (name);
     ccn_charbuf_destroy (&name);
   }
 
@@ -315,7 +298,7 @@ gst_ccnx_depkt_express_interest (GstCCNxDepacketizer *obj, gint64 seg)
   struct ccn_charbuf *templ = NULL;
   struct ccn_closure *callback = NULL;
 
-  char * key = NULL;
+  char *key = NULL;
   GstCCNxRetryEntry * entry =
       (GstCCNxRetryEntry *) malloc (sizeof(GstCCNxRetryEntry));
 
@@ -423,6 +406,10 @@ gst_ccnx_depkt_upcall (struct ccn_closure *selfp,
     return CCN_UPCALL_RESULT_OK;
   }
   else if (kind == CCN_UPCALL_CONTENT) {
+    char *key = NULL;
+
+    
+
     // TODO
     return CCN_UPCALL_RESULT_OK;
   }

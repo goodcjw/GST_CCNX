@@ -134,3 +134,24 @@ gst_ccnx_utils_append_exclude_any (struct ccn_charbuf *c)
     ccn_charbuf_append_closer (c);
   }
 }
+
+struct ccn_charbuf * 
+gst_ccnx_utils_get_name (const unsigned char *content, ContentObject *pco)
+{
+  size_t tmpBufferSize = pco->offset[CCN_PCO_B_Name] -
+      pco->offset[CCN_PCO_E_Name];
+  struct ccn_charbuf *tmpName = ccn_charbuf_create ();
+  ccn_uri_append (tmpName, content, tmpBufferSize, 1);
+  return tmpName;
+}
+
+struct ccn_charbuf * 
+gst_ccnx_utils_get_last_comp_from_name (const struct ccn_charbuf *name)
+{
+  size_t last;
+  struct ccn_charbuf *tmpLast = ccn_charbuf_create ();
+  for (last = name->length - 1; name->buf[last] != '/'; last--);
+  last++;
+  ccn_charbuf_append (tmpLast, &name->buf[last], name->length - last);
+  return tmpLast;
+}
