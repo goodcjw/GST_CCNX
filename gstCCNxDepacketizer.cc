@@ -85,7 +85,7 @@ gst_ccnx_depkt_fetch_stream_info (GstCCNxDepacketizer *obj)
                resBuffer, pcoBuffer, NULL, 0);
   
   if (r >= 0) {
-    obj->mStartTime = gst_ccnx_utils_get_timestamp (resBuffer, pcoBuffer);
+    obj->mStartTime = gst_ccnx_utils_get_timestamp (resBuffer->buf, pcoBuffer);
     contentBuffer = gst_ccnx_utils_get_content (resBuffer->buf, pcoBuffer);
     obj->mCaps = gst_caps_from_string (ccn_charbuf_as_string (contentBuffer));
   }
@@ -116,7 +116,7 @@ gst_ccnx_depkt_fetch_start_time (GstCCNxDepacketizer *obj)
                resBuffer, pcoBuffer, NULL, 0);
 
   if (r >= 0)
-    obj->mStartTime = gst_ccnx_utils_get_timestamp (resBuffer, pcoBuffer);
+    obj->mStartTime = gst_ccnx_utils_get_timestamp (resBuffer->buf, pcoBuffer);
 }
 
 static gint64

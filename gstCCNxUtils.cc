@@ -97,7 +97,7 @@ gst_ccnx_utils_get_content (
 
 gint32
 gst_ccnx_utils_get_timestamp (
-    const struct ccn_charbuf * content, ContentObject *pco)
+    const unsigned char * content, ContentObject *pco)
 {
   if (pco->offset[CCN_PCO_E_Timestamp] > pco->offset[CCN_PCO_B_Timestamp])
   {
@@ -107,7 +107,7 @@ gst_ccnx_utils_get_timestamp (
     size_t i;
     int secs;
     
-    ccn_ref_tagged_BLOB(CCN_DTAG_Timestamp, content->buf,
+    ccn_ref_tagged_BLOB(CCN_DTAG_Timestamp, content,
         pco->offset[CCN_PCO_B_Timestamp],
         pco->offset[CCN_PCO_E_Timestamp],
         &blob, &blob_size);

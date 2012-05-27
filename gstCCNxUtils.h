@@ -41,7 +41,7 @@ gst_ccnx_utils_get_content (
 
 gint32 
 gst_ccnx_utils_get_timestamp (
-    const struct ccn_charbuf * content, ContentObject *pco);
+    const unsigned char * content, ContentObject *pco);
 
 /*
  * This appends a tagged, valid, fully-saturated Bloom filter, useful for
