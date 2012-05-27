@@ -47,6 +47,7 @@ typedef enum {
 typedef struct _GstCCNxDepacketizer GstCCNxDepacketizer;
 typedef struct _GstCCNxDataQueueEntry GstCCNxDataQueueEntry;
 typedef struct _GstCCNxCmdsQueueEntry GstCCNxCmdsQueueEntry;
+typedef struct _GstCCNxRetryEntry GstCCNxRetryEntry;
 
 struct _GstCCNxDataQueueEntry {
   GstCCNxCmd                     mState;
@@ -58,13 +59,18 @@ struct _GstCCNxCmdsQueueEntry {
   guint64                        mTimestamp;
 };
 
+struct _GstCCNxRetryEntry {
+  gint32                         mRetryCnt;
+  GTimeVal                       mTimeVal;
+};
+
 struct _GstCCNxDepacketizer {
   /* size of input window */
   gint32                         mWindowSize;
   /* in units of 1/4096 seconds */
-  gint32                         mInterestLifetime;
+  guint32                        mInterestLifetime;
   /* how many times to retry request */
-  gint32                         mInterestRetries; 
+  gint32                         mRetryCnt;
   /* input data queue */
   GQueue                        *mDataQueue;
   /* duration of the stream (in nanoseconds) */
@@ -93,6 +99,7 @@ struct _GstCCNxDepacketizer {
   gint32                         mStatsDrops;
 
   pthread_t                      mReceiverThread;
+  GHashTable                    *mRetryTable;
   /* 
      self._tmp_retry_requests = {}
      DurationChecker = type('DurationChecker', (pyccn.Closure,),
@@ -102,7 +109,7 @@ struct _GstCCNxDepacketizer {
 };
 
 GstCCNxDepacketizer * gst_ccnx_depkt_create (
-    const gchar *name, gint32 window_size, gint32 time_out, gint32 retries);
+    const gchar *name, gint32 window_size, guint32 time_out, gint32 retries);
 void gst_ccnx_depkt_destroy (GstCCNxDepacketizer ** object);
 gboolean gst_ccnx_depkt_start (GstCCNxDepacketizer *object);
 gboolean gst_ccnx_depkt_stop (GstCCNxDepacketizer *object);

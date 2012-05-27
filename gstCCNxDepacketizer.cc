@@ -17,6 +17,8 @@
  * Boston, MA 02111-1307, USA.
  */
 
+#include <string.h>
+
 extern "C" {
 #include <ccn/uri.h>
 #include <ccn/charbuf.h>
@@ -308,9 +310,57 @@ gst_ccnx_depkt_duration_result (
 static gboolean
 gst_ccnx_depkt_express_interest (GstCCNxDepacketizer *obj, gint64 seg)
 {
-  // TODO
-  // mNameSegments
-  return FALSE;
+  struct ccn_charbuf *name = NULL;
+  struct ccn_charbuf *segName = NULL;
+  struct ccn_charbuf *templ = NULL;
+  struct ccn_closure *callback = NULL;
+
+  char * key = NULL;
+  GstCCNxRetryEntry * entry =
+      (GstCCNxRetryEntry *) malloc (sizeof(GstCCNxRetryEntry));
+
+  name = ccn_charbuf_create ();
+  ccn_charbuf_append_charbuf (name, obj->mNameSegments);
+  segName = ccn_charbuf_create ();
+  gst_ccnx_depkt_num2seg (seg, segName);
+  ccn_name_from_uri (name, ccn_charbuf_as_string (segName));
+
+  entry->mRetryCnt = obj->mRetryCnt;
+  g_get_current_time (&entry->mTimeVal);
+  key = strdup (ccn_charbuf_as_string (segName));
+  g_hash_table_insert (obj->mRetryTable, key, entry);
+
+  templ = ccn_charbuf_create ();
+  /* <Interest>           */
+  ccn_charbuf_append_tt (templ, CCN_DTAG_Interest, CCN_DTAG);
+
+  /* <Name>               */
+  ccn_charbuf_append_tt (templ, CCN_DTAG_Name, CCN_DTAG);
+  ccn_charbuf_append_closer (templ);
+  /* </Name>              */
+
+  /* <Lifetime>           */
+  unsigned char buf[3] = { 0 };
+  guint32 lifetime_l12 = obj->mInterestLifetime;
+  int i;
+  for (i = sizeof(buf) - 1; i >= 0; i--, lifetime_l12 >>= 8)
+    buf[i] = lifetime_l12 & 0xff;
+  ccnb_append_tagged_blob (templ, CCN_DTAG_InterestLifetime, buf, sizeof(buf));
+  /* </Lifetime>          */
+
+  ccn_charbuf_append_closer (templ);
+  /* </Interest>          */
+
+  callback = (struct ccn_closure*) calloc (1, sizeof(struct ccn_closure));
+  callback->data = obj;
+  callback->p = &gst_ccnx_depkt_upcall;
+  ccn_express_interest (obj->mCCNx, name, callback, templ);
+
+  ccn_charbuf_destroy (&name);
+  ccn_charbuf_destroy (&segName);
+  ccn_charbuf_destroy (&templ);
+
+  return TRUE;
 }
 
 static void
@@ -421,13 +471,13 @@ gst_ccnx_depkt_num2seg (guint64 num, struct ccn_charbuf *seg)
 
 GstCCNxDepacketizer *
 gst_ccnx_depkt_create (
-    const gchar *name, gint32 window_size, gint32 time_out, gint32 retries)
+    const gchar *name, gint32 window_size, guint32 time_out, gint32 retries)
 {
   GstCCNxDepacketizer *obj =
       (GstCCNxDepacketizer *) malloc (sizeof(GstCCNxDepacketizer));
   obj->mWindowSize = window_size;
   obj->mInterestLifetime = time_out;
-  obj->mInterestRetries = retries;
+  obj->mRetryCnt = retries;
 
   obj->mDataQueue = g_queue_new ();
   obj->mDurationNs = -1;
@@ -462,6 +512,9 @@ gst_ccnx_depkt_create (
   obj->mSegmenter = gst_ccnx_segmenter_create (
       obj, gst_ccnx_depkt_push_data, GST_CCNX_CHUNK_SIZE);
 
+  obj->mRetryTable = 
+      g_hash_table_new_full (g_str_hash, g_str_equal, free, free);
+
   return obj;
 }
 
@@ -494,6 +547,8 @@ gst_ccnx_depkt_destroy (GstCCNxDepacketizer **obj)
     ccn_charbuf_destroy (&depkt->mDurationLast);
     gst_ccnx_fb_destroy (&depkt->mFetchBuffer);
     gst_ccnx_segmenter_destroy (&depkt->mSegmenter);
+    g_hash_table_destroy (depkt->mRetryTable);
+
     /* destroy the object itself */
     free (depkt);
     *obj = NULL;
@@ -548,11 +603,11 @@ gst_ccnx_depkt_seek (GstCCNxDepacketizer *obj, gint64 seg_start)
 
 guint64
 test_pack_unpack (guint64 num) {
-  struct ccn_charbuf *buf_1 = ccn_charbuf_create();
+  struct ccn_charbuf *buf_1 = ccn_charbuf_create ();
   gst_ccnx_depkt_num2seg(num, buf_1);
   fwrite (buf_1->buf, buf_1->length, 1, stdout);
-  num = gst_ccnx_depkt_seg2num(buf_1);
-  printf("\t%llu\n", num);
+  num = gst_ccnx_depkt_seg2num (buf_1);
+  printf("\t%lu\n", num);
   return num;
 }
 
