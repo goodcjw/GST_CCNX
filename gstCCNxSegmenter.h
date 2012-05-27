@@ -36,7 +36,7 @@ typedef struct _GstCCNxPacketHeader GstCCNxPacketHeader;
 typedef struct _GstCCNxSegmentHeader GstCCNxSegmentHeader;
 
 typedef void (*gst_ccnx_seg_callback) (
-    GstCCNxDepacketizer *obj, const GstBuffer * buf);
+    GstCCNxDepacketizer *obj, GstBuffer * buf);
 
 struct _GstCCNxSegmenter {
   GstCCNxDepacketizer          *mDepkt;

@@ -30,14 +30,14 @@ static void gst_ccnx_depkt_set_window (
 static void gst_ccnx_depkt_fetch_stream_info (GstCCNxDepacketizer *obj);
 static void gst_ccnx_depkt_fetch_start_time (GstCCNxDepacketizer *obj);
 static gint64 gst_ccnx_depkt_fetch_seek_query ( 
-    GstCCNxDepacketizer *obj, gint64 to_seek);
+    GstCCNxDepacketizer *obj, guint64 *idxNum);
 
 static void gst_ccnx_depkt_finish_ccnx_loop (GstCCNxDepacketizer *obj);
 static gboolean gst_ccnx_depkt_check_duration (GstCCNxDepacketizer *obj);
 // TODO: def __check_duration(self, interest):
 
 // Bellow methods are called by thread
-static void * gst_ccnx_depkt_run (void *obj);
+static void *gst_ccnx_depkt_run (void *obj);
 static void gst_ccnx_depkt_process_cmds (GstCCNxDepacketizer *obj);
 // def duration_process_result(self, kind, info):
 static enum ccn_upcall_res gst_ccnx_depkt_duration_result (
@@ -48,16 +48,16 @@ static enum ccn_upcall_res gst_ccnx_depkt_duration_result (
 static gboolean gst_ccnx_depkt_express_interest (
     GstCCNxDepacketizer *obj, gint64 seg);
 static void gst_ccnx_depkt_process_response (
-    GstCCNxDepacketizer *obj, struct ccn_charbuf *buf, ContentObject* pco);
+    GstCCNxDepacketizer *obj, struct ccn_charbuf *buf, ContentObject*pco);
 static void gst_ccnx_depkt_push_data (
-    GstCCNxDepacketizer *obj, const GstBuffer * buf);
+    GstCCNxDepacketizer *obj, GstBuffer *buf);
 
 static enum ccn_upcall_res gst_ccnx_depkt_upcall (
     struct ccn_closure *selfp,
     enum ccn_upcall_kind kind,
     struct ccn_upcall_info *info);
 
-static void gst_ccnx_depkt_num2seg (guint64 num, struct ccn_charbuf* seg);
+static void gst_ccnx_depkt_num2seg (guint64 num, struct ccn_charbuf*seg);
 static guint64 gst_ccnx_depkt_seg2num (const struct ccn_charbuf* seg);
 
 static void
@@ -71,11 +71,11 @@ gst_ccnx_depkt_fetch_stream_info (GstCCNxDepacketizer *obj)
 {
   gint r;
   /* prepare return values */
-  struct ccn_charbuf * resBuffer = ccn_charbuf_create ();
-  struct ccn_charbuf * contentBuffer = NULL;
-  ContentObject * pcoBuffer = (ContentObject *) malloc (sizeof(ContentObject));
+  struct ccn_charbuf *resBuffer = ccn_charbuf_create ();
+  struct ccn_charbuf *contentBuffer = NULL;
+  ContentObject *pcoBuffer = (ContentObject *) malloc (sizeof(ContentObject));
   /* prepare name for stream_info */
-  struct ccn_charbuf * nameStreamInfo = ccn_charbuf_create ();
+  struct ccn_charbuf *nameStreamInfo = ccn_charbuf_create ();
   ccn_charbuf_append_charbuf (nameStreamInfo, obj->mName);
   ccn_name_from_uri (nameStreamInfo, "stream_info");
 
@@ -102,10 +102,10 @@ gst_ccnx_depkt_fetch_start_time (GstCCNxDepacketizer *obj)
 {
   gint r;
   /* prepare return values */
-  struct ccn_charbuf * resBuffer = ccn_charbuf_create ();
-  ContentObject * pcoBuffer = (ContentObject *) malloc (sizeof(ContentObject));
+  struct ccn_charbuf *resBuffer = ccn_charbuf_create ();
+  ContentObject *pcoBuffer = (ContentObject *) malloc (sizeof(ContentObject));
   /* prepare name for start time */
-  struct ccn_charbuf * nameSegmentZero = ccn_charbuf_create ();
+  struct ccn_charbuf *nameSegmentZero = ccn_charbuf_create ();
   ccn_charbuf_append_charbuf (nameSegmentZero, obj->mName);
   ccn_name_from_uri (nameSegmentZero, "segments");
   ccn_name_from_uri (nameSegmentZero, "%%00");
@@ -118,9 +118,96 @@ gst_ccnx_depkt_fetch_start_time (GstCCNxDepacketizer *obj)
 }
 
 static gint64
-gst_ccnx_depkt_fetch_seek_query (GstCCNxDepacketizer *obj, gint64 to_seek)
+gst_ccnx_depkt_fetch_seek_query (GstCCNxDepacketizer *obj, guint64 *idxNum)
 {
-  // TODO
+  gint r;
+  size_t retNameSize, idxPosition;
+  guint64 segNum;
+  struct ccn_charbuf *idxName = NULL;
+  struct ccn_charbuf *comp = NULL;  /* used to represent an entry to exclude */
+  struct ccn_charbuf *templ = NULL;
+  struct ccn_charbuf *retName = NULL;
+  struct ccn_charbuf *retBuffer = NULL;
+  struct ccn_charbuf *contentBuffer = NULL;
+  ContentObject *pcoBuffer = NULL;
+
+  templ = ccn_charbuf_create ();
+  /* <Interest>           */
+  ccn_charbuf_append_tt (templ, CCN_DTAG_Interest, CCN_DTAG);
+
+  /* <Name>               */
+  ccn_charbuf_append_tt (templ, CCN_DTAG_Name, CCN_DTAG);
+  ccn_charbuf_append_closer (templ);
+  /* </Name>              */
+  
+  /* <Exclude>            */
+  ccn_charbuf_append_tt (templ, CCN_DTAG_Exclude, CCN_DTAG);
+  /* prepare the name to be excluded, seek until the given timestamp */
+  idxName = ccn_charbuf_create ();
+  comp = ccn_charbuf_create ();
+  gst_ccnx_depkt_num2seg (*idxNum + 1, idxName);
+  ccn_name_init (comp);
+  ccn_name_from_uri (comp, ccn_charbuf_as_string (idxName));
+  ccn_charbuf_append(templ, comp->buf + 1, comp->length - 2);
+  gst_ccnx_utils_append_exclude_any (templ);
+  ccn_charbuf_destroy (&comp);
+  ccn_charbuf_destroy (&idxName);
+  ccn_charbuf_append_closer (templ);
+  /* </Exclude>           */
+
+  /* <ChildSelector>      */
+  ccnb_tagged_putf(templ, CCN_DTAG_ChildSelector, "1");
+  /* </ChildSelector>     */
+
+  /* <AnswerOriginKind>   */
+  ccn_charbuf_append_tt(templ, CCN_DTAG_AnswerOriginKind, CCN_DTAG);
+  ccnb_append_number(templ, 0);
+  ccn_charbuf_append_closer(templ);
+  /* </AnswerOriginKind>  */
+
+  ccn_charbuf_append_closer (templ);
+  /* </Interest>          */
+
+  /* prepare return bufferes */
+  retBuffer = ccn_charbuf_create ();
+  pcoBuffer = (ContentObject *) malloc (sizeof (ContentObject));
+
+  while (TRUE) {
+    /* FIXME: daddy, i want the candy, or i'll never give up asking */
+    r = ccn_get (obj->mCCNx, obj->mNameFrames, templ, GST_CCNX_CCN_GET_TIMEOUT,
+                 retBuffer, pcoBuffer, NULL, 0);
+    if (r >= 0)
+      break;
+  }
+
+  /* get the real index returned with content */
+  retNameSize = pcoBuffer->offset[CCN_PCO_B_Name] -
+      pcoBuffer->offset[CCN_PCO_E_Name];
+  retName = ccn_charbuf_create ();
+  ccn_uri_append (retName, retBuffer->buf, retNameSize, 1);
+
+  idxName = ccn_charbuf_create ();
+  for (idxPosition = retName->length - 1;
+       retName->buf[idxPosition] != '/';
+       idxPosition--);
+  idxPosition++;
+  ccn_charbuf_append (idxName, &retName->buf[idxPosition], 
+                      retName->length - idxPosition);
+  *idxNum = gst_ccnx_depkt_seg2num (idxName);
+
+  /* get the content of this packet as segNum */
+  contentBuffer = gst_ccnx_utils_get_content (retBuffer, pcoBuffer);
+  if (contentBuffer != NULL && contentBuffer->length > 0) {
+    segNum = strtoul (ccn_charbuf_as_string (contentBuffer), NULL, 10);
+  }
+  // return (self.index2ts(index), segment)
+
+  ccn_charbuf_destroy (&templ);
+  ccn_charbuf_destroy (&retName);
+  ccn_charbuf_destroy (&retBuffer);
+  ccn_charbuf_destroy (&contentBuffer);
+  if (pcoBuffer != NULL)
+    free (pcoBuffer);
   return 0;
 }
 
@@ -147,9 +234,9 @@ gst_ccnx_depkt_check_duration (GstCCNxDepacketizer *obj)
 }
 
 static void*
-gst_ccnx_depkt_run (void* arg)
+gst_ccnx_depkt_run (void *arg)
 {
-  GstCCNxDepacketizer * obj = (GstCCNxDepacketizer *) arg;
+  GstCCNxDepacketizer *obj = (GstCCNxDepacketizer *) arg;
   while (obj->mRunning) {
     gst_ccnx_depkt_check_duration (obj);
     ccn_run (obj->mCCNx, 10000);
@@ -161,8 +248,9 @@ gst_ccnx_depkt_run (void* arg)
 static void
 gst_ccnx_depkt_process_cmds (GstCCNxDepacketizer *obj)
 {
-  gint64 to_seek = 0;
-  GstCCNxCmdsQueueEntry * cmds_entry = NULL;
+  guint64 idxNum = 0;
+  guint64 segNum = 0;
+  GstCCNxCmdsQueueEntry *cmds_entry = NULL;
 
   if (g_queue_is_empty (obj->mCmdsQueue))
     return;
@@ -170,9 +258,11 @@ gst_ccnx_depkt_process_cmds (GstCCNxDepacketizer *obj)
   cmds_entry = (GstCCNxCmdsQueueEntry *) g_queue_pop_tail (obj->mCmdsQueue);
 
   if (cmds_entry->mState == GST_CMD_SEEK) {
-    to_seek = gst_ccnx_depkt_fetch_seek_query (obj, to_seek);
+    idxNum = cmds_entry->mTimestamp;
+    segNum = gst_ccnx_depkt_fetch_seek_query (obj, &idxNum);
     obj->mSeekSegment = TRUE;
     gst_ccnx_segmenter_pkt_lost (obj->mSegmenter);
+    gst_ccnx_fb_reset (obj->mFetchBuffer, segNum);
     // FIXME _cmd_q.task_done ()
   }
 }
@@ -184,8 +274,8 @@ gst_ccnx_depkt_duration_result (
     struct ccn_upcall_info *info)
 {
 
-  GstCCNxDepacketizer * obj = (GstCCNxDepacketizer *) selfp->data;
-  struct ccn_charbuf * name;
+  GstCCNxDepacketizer *obj = (GstCCNxDepacketizer *) selfp->data;
+  struct ccn_charbuf *name;
   size_t len, last;
 
   if (kind == CCN_UPCALL_FINAL)
@@ -225,23 +315,48 @@ gst_ccnx_depkt_express_interest (GstCCNxDepacketizer *obj, gint64 seg)
 
 static void
 gst_ccnx_depkt_process_response (
-    GstCCNxDepacketizer *obj, struct ccn_charbuf * buf, ContentObject * pco)
+    GstCCNxDepacketizer *obj, struct ccn_charbuf *buf, ContentObject *pco)
 {
   /* when this function returns, buf and pco will be released immediately */
-  struct ccn_charbuf * content;
+  struct ccn_charbuf *content;
   if (pco == NULL) {
     gst_ccnx_segmenter_pkt_lost (obj->mSegmenter);
     return;
   }
   content = gst_ccnx_utils_get_content (buf, pco);
-  /* now we get the content, hopefully, we don't need buf and pco anymore */
+  // now we get the content, we don't need buf and pco anymore,
+  // content as a ccn_charbuf will be freed in segmenter's queue management.
   gst_ccnx_segmenter_process_pkt (obj->mSegmenter, content);
 }
 
 static void
-gst_ccnx_depkt_push_data (GstCCNxDepacketizer *obj, const GstBuffer * buf)
+gst_ccnx_depkt_push_data (GstCCNxDepacketizer *obj, GstBuffer *buf)
 {
-  // TODO
+  GstCCNxCmd status = GST_CMD_INVALID;
+  gint32 queueSize;
+  GstCCNxDataQueueEntry *entry;
+
+  if (obj->mSeekSegment == TRUE) {
+    status = GST_CMD_SEEK;
+    obj->mSeekSegment = FALSE;
+  }
+
+  while (TRUE) {
+    /* FIXME this shall be run in a seperate thread ? */
+    queueSize = g_queue_get_length (obj->mDataQueue);
+    if (queueSize < obj->mWindowSize * 2) {
+      entry = (GstCCNxDataQueueEntry *) malloc (sizeof(GstCCNxDataQueueEntry));
+      entry->mState = status;
+      entry->mData = buf;
+      g_queue_push_head (obj->mDataQueue, entry);
+      break;
+    }
+    else {
+      /* the queue is full */
+      if (obj->mRunning == FALSE)
+        break;
+    }
+  }
 }
 
 static enum ccn_upcall_res
@@ -254,7 +369,7 @@ gst_ccnx_depkt_upcall (struct ccn_closure *selfp,
 }
 
 static guint64
-gst_ccnx_depkt_seg2num (const struct ccn_charbuf* seg)
+gst_ccnx_depkt_seg2num (const struct ccn_charbuf *seg)
 {
   size_t i;
   guint64 num = 0;
@@ -274,11 +389,11 @@ gst_ccnx_depkt_seg2num (const struct ccn_charbuf* seg)
 }
 
 static void
-gst_ccnx_depkt_num2seg (guint64 num, struct ccn_charbuf* seg)
+gst_ccnx_depkt_num2seg (guint64 num, struct ccn_charbuf *seg)
 {
   size_t i;
   char aByte;
-  struct ccn_charbuf * tmp;
+  struct ccn_charbuf *tmp;
 
   tmp = ccn_charbuf_create ();
   while (num != 0) {
@@ -308,7 +423,7 @@ GstCCNxDepacketizer *
 gst_ccnx_depkt_create (
     const gchar *name, gint32 window_size, gint32 time_out, gint32 retries)
 {
-  GstCCNxDepacketizer * obj =
+  GstCCNxDepacketizer *obj =
       (GstCCNxDepacketizer *) malloc (sizeof(GstCCNxDepacketizer));
   obj->mWindowSize = window_size;
   obj->mInterestLifetime = time_out;
@@ -351,17 +466,19 @@ gst_ccnx_depkt_create (
 }
 
 void
-gst_ccnx_depkt_destroy (GstCCNxDepacketizer ** obj)
+gst_ccnx_depkt_destroy (GstCCNxDepacketizer **obj)
 {
-  GstCCNxDepacketizer * depkt = *obj;
-  GstCCNxDataQueueEntry * data_entry;
-  GstCCNxCmdsQueueEntry * cmds_entry;
+  GstCCNxDepacketizer *depkt = *obj;
+  GstCCNxDataQueueEntry *data_entry;
+  GstCCNxCmdsQueueEntry *cmds_entry;
 
   if (depkt != NULL) {
     /* destroy data queue and cmds queue */
     while ((data_entry = (GstCCNxDataQueueEntry *) g_queue_pop_tail (
-               depkt->mDataQueue)) != NULL)
+               depkt->mDataQueue)) != NULL) {
+      gst_buffer_unref (data_entry->mData);
       free (data_entry);
+    }
     while ((cmds_entry = (GstCCNxCmdsQueueEntry *) g_queue_pop_tail (
                depkt->mCmdsQueue)) != NULL)
       free (cmds_entry);
@@ -418,7 +535,7 @@ gst_ccnx_depkt_init_duration (GstCCNxDepacketizer *obj)
 void
 gst_ccnx_depkt_seek (GstCCNxDepacketizer *obj, gint64 seg_start)
 {
-  GstCCNxCmdsQueueEntry * cmds_entry =
+  GstCCNxCmdsQueueEntry *cmds_entry =
       (GstCCNxCmdsQueueEntry *) malloc (sizeof(GstCCNxCmdsQueueEntry));
   cmds_entry->mState = GST_CMD_SEEK;
   cmds_entry->mTimestamp = seg_start;
@@ -431,11 +548,11 @@ gst_ccnx_depkt_seek (GstCCNxDepacketizer *obj, gint64 seg_start)
 
 guint64
 test_pack_unpack (guint64 num) {
-  struct ccn_charbuf* buf_1 = ccn_charbuf_create();
+  struct ccn_charbuf *buf_1 = ccn_charbuf_create();
   gst_ccnx_depkt_num2seg(num, buf_1);
   fwrite (buf_1->buf, buf_1->length, 1, stdout);
   num = gst_ccnx_depkt_seg2num(buf_1);
-  printf("\t%d\n", num);
+  printf("\t%llu\n", num);
   return num;
 }
 

@@ -291,8 +291,9 @@ static GstFlowReturn
 gst_ccnx_src_create (
     GstBaseSrc * basesrc, guint64 offset, guint length, GstBuffer ** buffer)
 {
-  GstCCNxSrc *src = GST_CCNX_SRC (basesrc);
-  GstBuffer *buf;
+  GstCCNxCmd status = GST_CMD_INVALID;
+  GstCCNxSrc * src = GST_CCNX_SRC (basesrc);
+  GstCCNxDataQueueEntry * data_entry = NULL;
   
   if (src->mNoLocking) {
     return GST_FLOW_WRONG_STATE;
@@ -304,16 +305,20 @@ gst_ccnx_src_create (
         return GST_FLOW_WRONG_STATE;
       }
       else {
-        /* starving for data, sleep for a while */
+        /* FIXME starving for data, sleep for a while */
         sleep(GST_CCNX_DEPKT_QUEUE_TIMEOUT);
         continue;
       }
     }
 
-    GstCCNxDataQueueEntry * data_entry = 
-        (GstCCNxDataQueueEntry *) g_queue_peek_tail (src->mDepkt->mDataQueue);
+    data_entry = (GstCCNxDataQueueEntry *) g_queue_peek_tail (
+        src->mDepkt->mDataQueue);
     g_queue_pop_tail (src->mDepkt->mDataQueue);
-    // TODO release data_entry later !!!
+    if (data_entry != NULL) {
+      *buffer = data_entry->mData;
+      status = data_entry->mState;
+      free (data_entry);
+    }
     
     // TODO multithreading on the queue ???
     if (src->mNoLocking)
@@ -333,12 +338,10 @@ gst_ccnx_src_create (
           &src->mBase.element, "src");
       gst_pad_push_event (src_pad, event);
       src->mSeeking = -1;
-      buf = gst_buffer_new ();
-      GST_BUFFER_FLAG_SET (buf, GST_BUFFER_FLAG_DISCONT);
-      return GST_FLOW_OK;
+      GST_BUFFER_FLAG_SET (*buffer, GST_BUFFER_FLAG_DISCONT);
     }
+    return GST_FLOW_OK;
   }
-  return GST_FLOW_ERROR;
 }
 
 static gboolean

@@ -63,5 +63,6 @@ GstCCNxFetchBuffer * gst_ccnx_fb_create (
     gst_ccnx_fb_request_cb req, gst_ccnx_fb_response_cb rep);
 
 void gst_ccnx_fb_destroy (GstCCNxFetchBuffer ** object);
+void gst_ccnx_fb_reset (GstCCNxFetchBuffer *object, gint64 position);
 
 #endif // __GST_CCNX_FETCH_BUFFER_H__

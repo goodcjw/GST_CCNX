@@ -50,12 +50,12 @@ typedef struct _GstCCNxCmdsQueueEntry GstCCNxCmdsQueueEntry;
 
 struct _GstCCNxDataQueueEntry {
   GstCCNxCmd                     mState;
-  struct ccn_charbuf            *mData;
+  GstBuffer                     *mData;
 };
 
 struct _GstCCNxCmdsQueueEntry {
   GstCCNxCmd                     mState;
-  gint64                         mTimestamp;
+  guint64                        mTimestamp;
 };
 
 struct _GstCCNxDepacketizer {

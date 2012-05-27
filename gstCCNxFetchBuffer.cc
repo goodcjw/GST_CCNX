@@ -22,7 +22,6 @@ extern "C" {
 }
 #include "gstCCNxFetchBuffer.h"
 
-static void gst_ccnx_fb_reset (GstCCNxFetchBuffer* object, gint64 position);
 static void gst_ccnx_fb_put (GstCCNxFetchBuffer* object, gint64 num,
                              struct ccn_charbuf *buf, ContentObject * pco);
 static void gst_ccnx_fb_timeout (GstCCNxFetchBuffer* object, gint64 num);
@@ -31,7 +30,7 @@ static void gst_ccnx_fb_request_data (GstCCNxFetchBuffer* object);
 static void gst_ccnx_fb_push_data (GstCCNxFetchBuffer* object);
 static void gst_ccnx_fb_entry_destroy (void * object);
 
-static void
+void
 gst_ccnx_fb_reset (GstCCNxFetchBuffer* object, gint64 position)
 {
   g_hash_table_remove_all (object->mBuffer);
