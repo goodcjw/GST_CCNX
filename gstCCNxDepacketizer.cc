@@ -414,8 +414,29 @@ gst_ccnx_depkt_upcall (struct ccn_closure *selfp,
                        enum ccn_upcall_kind kind,
                        struct ccn_upcall_info *info)
 {
-  // TODO
-  return CCN_UPCALL_RESULT_OK;
+  GstCCNxDepacketizer *depkt = (GstCCNxDepacketizer *) selfp->data;
+
+  if (depkt->mRunning) {
+    return CCN_UPCALL_RESULT_OK;
+  }
+  else if (kind == CCN_UPCALL_FINAL) {
+    return CCN_UPCALL_RESULT_OK;
+  }
+  else if (kind == CCN_UPCALL_CONTENT) {
+    // TODO
+    return CCN_UPCALL_RESULT_OK;
+  }
+  else if (kind == CCN_UPCALL_INTEREST_TIMED_OUT) {
+    // TOOD
+    return CCN_UPCALL_RESULT_OK;
+  }
+  else if (kind == CCN_UPCALL_CONTENT_UNVERIFIED) {
+    // TODO
+    return CCN_UPCALL_RESULT_VERIFY;
+  }
+  
+  /* DEBUG: Got unknown kind */
+  return CCN_UPCALL_RESULT_ERR;
 }
 
 static guint64
