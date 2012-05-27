@@ -86,7 +86,7 @@ gst_ccnx_depkt_fetch_stream_info (GstCCNxDepacketizer *obj)
   
   if (r >= 0) {
     obj->mStartTime = gst_ccnx_utils_get_timestamp (resBuffer, pcoBuffer);
-    contentBuffer = gst_ccnx_utils_get_content (resBuffer, pcoBuffer);
+    contentBuffer = gst_ccnx_utils_get_content (resBuffer->buf, pcoBuffer);
     obj->mCaps = gst_caps_from_string (ccn_charbuf_as_string (contentBuffer));
   }
 
@@ -198,7 +198,7 @@ gst_ccnx_depkt_fetch_seek_query (GstCCNxDepacketizer *obj, guint64 *idxNum)
   *idxNum = gst_ccnx_depkt_seg2num (idxName);
 
   /* get the content of this packet as segNum */
-  contentBuffer = gst_ccnx_utils_get_content (retBuffer, pcoBuffer);
+  contentBuffer = gst_ccnx_utils_get_content (retBuffer->buf, pcoBuffer);
   if (contentBuffer != NULL && contentBuffer->length > 0) {
     segNum = strtoul (ccn_charbuf_as_string (contentBuffer), NULL, 10);
   }
@@ -373,7 +373,7 @@ gst_ccnx_depkt_process_response (
     gst_ccnx_segmenter_pkt_lost (obj->mSegmenter);
     return;
   }
-  content = gst_ccnx_utils_get_content (buf, pco);
+  content = gst_ccnx_utils_get_content (buf->buf, pco);
   // now we get the content, we don't need buf and pco anymore,
   // content as a ccn_charbuf will be freed in segmenter's queue management.
   gst_ccnx_segmenter_process_pkt (obj->mSegmenter, content);
@@ -431,7 +431,7 @@ gst_ccnx_depkt_upcall (struct ccn_closure *selfp,
     return CCN_UPCALL_RESULT_OK;
   }
   else if (kind == CCN_UPCALL_CONTENT_UNVERIFIED) {
-    // TODO
+    /* DEBUG: unverified content */
     return CCN_UPCALL_RESULT_VERIFY;
   }
   

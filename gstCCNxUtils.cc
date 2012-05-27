@@ -67,14 +67,14 @@ gst_ccnx_unpack_be_guint (void* ret_int, const unsigned char* seg, size_t len)
 
 struct ccn_charbuf * 
 gst_ccnx_utils_get_content (
-    const struct ccn_charbuf * buf, ContentObject *pco)
+    const unsigned char * buf, ContentObject *pco)
 {
   int r;
   struct ccn_charbuf * resBuffer = NULL;
   const unsigned char * tmpBuffer = NULL;
   size_t tmpBufferSize;
 
-  r = ccn_ref_tagged_BLOB (CCN_DTAG_Content, buf->buf,
+  r = ccn_ref_tagged_BLOB (CCN_DTAG_Content, buf,
                            pco->offset[CCN_PCO_B_Content],
                            pco->offset[CCN_PCO_E_Content],
                            &tmpBuffer,

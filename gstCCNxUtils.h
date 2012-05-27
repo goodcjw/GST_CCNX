@@ -37,7 +37,7 @@ gst_ccnx_unpack_be_guint (void* ret_int, const unsigned char* seg, size_t len);
 
 struct ccn_charbuf * 
 gst_ccnx_utils_get_content (
-    const struct ccn_charbuf * content, ContentObject *pco);
+    const unsigned char * content, ContentObject *pco);
 
 gint32 
 gst_ccnx_utils_get_timestamp (
