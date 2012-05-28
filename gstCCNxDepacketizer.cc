@@ -36,8 +36,12 @@ static gint64 gst_ccnx_depkt_fetch_seek_query (
     GstCCNxDepacketizer *obj, guint64 *idxNum);
 
 static void gst_ccnx_depkt_finish_ccnx_loop (GstCCNxDepacketizer *obj);
+
+// TODO
 static gboolean gst_ccnx_depkt_check_duration (GstCCNxDepacketizer *obj);
-// TODO: def __check_duration(self, interest):
+
+static struct ccn_charbuf* gst_ccnx_depkt_get_duration (
+    GstCCNxDepacketizer *obj, struct ccn_charbuf *intBuff);
 
 // Bellow methods are called by thread
 static void *gst_ccnx_depkt_run (void *obj);
@@ -73,28 +77,31 @@ static void
 gst_ccnx_depkt_fetch_stream_info (GstCCNxDepacketizer *obj)
 {
   gint r;
+  struct ccn_charbuf *resBuff = NULL;   /* the raw result buffer with ccnb */
+  struct ccn_charbuf *conBuff = NULL;   /* the pure content received */
+  ContentObject *pcoBuff = NULL;
+
   /* prepare return values */
-  struct ccn_charbuf *resBuffer = ccn_charbuf_create ();
-  struct ccn_charbuf *contentBuffer = NULL;
-  ContentObject *pcoBuffer = (ContentObject *) malloc (sizeof(ContentObject));
+  resBuff = ccn_charbuf_create ();
+  pcoBuff = (ContentObject *) malloc (sizeof(ContentObject));
   /* prepare name for stream_info */
   struct ccn_charbuf *nameStreamInfo = ccn_charbuf_create ();
   ccn_charbuf_append_charbuf (nameStreamInfo, obj->mName);
   ccn_name_from_uri (nameStreamInfo, "stream_info");
 
   r = ccn_get (obj->mCCNx, nameStreamInfo, NULL, GST_CCNX_CCN_GET_TIMEOUT,
-               resBuffer, pcoBuffer, NULL, 0);
+               resBuff, pcoBuff, NULL, 0);
   
   if (r >= 0) {
-    obj->mStartTime = gst_ccnx_utils_get_timestamp (resBuffer->buf, pcoBuffer);
-    contentBuffer = gst_ccnx_utils_get_content (resBuffer->buf, pcoBuffer);
-    obj->mCaps = gst_caps_from_string (ccn_charbuf_as_string (contentBuffer));
+    obj->mStartTime = gst_ccnx_utils_get_timestamp (resBuff->buf, pcoBuff);
+    conBuff = gst_ccnx_utils_get_content (resBuff->buf, pcoBuff);
+    obj->mCaps = gst_caps_from_string (ccn_charbuf_as_string (conBuff));
   }
 
-  ccn_charbuf_destroy (&resBuffer);
+  ccn_charbuf_destroy (&resBuff);
   ccn_charbuf_destroy (&nameStreamInfo);
-  ccn_charbuf_destroy (&contentBuffer);
-  free (pcoBuffer);
+  ccn_charbuf_destroy (&conBuff);
+  free (pcoBuff);
 
   if (obj->mStartTime < 0)
     gst_ccnx_depkt_fetch_start_time (obj);
@@ -105,8 +112,8 @@ gst_ccnx_depkt_fetch_start_time (GstCCNxDepacketizer *obj)
 {
   gint r;
   /* prepare return values */
-  struct ccn_charbuf *resBuffer = ccn_charbuf_create ();
-  ContentObject *pcoBuffer = (ContentObject *) malloc (sizeof(ContentObject));
+  struct ccn_charbuf *resBuff = ccn_charbuf_create ();
+  ContentObject *pcoBuff = (ContentObject *) malloc (sizeof(ContentObject));
   /* prepare name for start time */
   struct ccn_charbuf *nameSegmentZero = ccn_charbuf_create ();
   ccn_charbuf_append_charbuf (nameSegmentZero, obj->mName);
@@ -114,10 +121,10 @@ gst_ccnx_depkt_fetch_start_time (GstCCNxDepacketizer *obj)
   ccn_name_from_uri (nameSegmentZero, "%%00");
 
   r = ccn_get (obj->mCCNx, nameSegmentZero, NULL, GST_CCNX_CCN_GET_TIMEOUT,
-               resBuffer, pcoBuffer, NULL, 0);
+               resBuff, pcoBuff, NULL, 0);
 
   if (r >= 0)
-    obj->mStartTime = gst_ccnx_utils_get_timestamp (resBuffer->buf, pcoBuffer);
+    obj->mStartTime = gst_ccnx_utils_get_timestamp (resBuff->buf, pcoBuff);
 }
 
 static gint64
@@ -127,78 +134,78 @@ gst_ccnx_depkt_fetch_seek_query (GstCCNxDepacketizer *obj, guint64 *idxNum)
   guint64 segNum;
   struct ccn_charbuf *idxName = NULL;
   struct ccn_charbuf *comp = NULL;  /* used to represent an entry to exclude */
-  struct ccn_charbuf *templ = NULL;
+  struct ccn_charbuf *intBuff = NULL;
   struct ccn_charbuf *retName = NULL;
-  struct ccn_charbuf *retBuffer = NULL;
-  struct ccn_charbuf *contentBuffer = NULL;
-  ContentObject *pcoBuffer = NULL;
+  struct ccn_charbuf *retBuff = NULL;
+  struct ccn_charbuf *conBuff = NULL;
+  ContentObject *pcoBuff = NULL;
 
-  templ = ccn_charbuf_create ();
+  intBuff = ccn_charbuf_create ();
   /* <Interest>           */
-  ccn_charbuf_append_tt (templ, CCN_DTAG_Interest, CCN_DTAG);
+  ccn_charbuf_append_tt (intBuff, CCN_DTAG_Interest, CCN_DTAG);
 
   /* <Name>               */
-  ccn_charbuf_append_tt (templ, CCN_DTAG_Name, CCN_DTAG);
-  ccn_charbuf_append_closer (templ);
+  ccn_charbuf_append_tt (intBuff, CCN_DTAG_Name, CCN_DTAG);
+  ccn_charbuf_append_closer (intBuff);
   /* </Name>              */
   
   /* <Exclude>            */
-  ccn_charbuf_append_tt (templ, CCN_DTAG_Exclude, CCN_DTAG);
+  ccn_charbuf_append_tt (intBuff, CCN_DTAG_Exclude, CCN_DTAG);
   /* prepare the name to be excluded, seek until the given timestamp */
   idxName = ccn_charbuf_create ();
   comp = ccn_charbuf_create ();
   gst_ccnx_depkt_num2seg (*idxNum + 1, idxName);
   ccn_name_init (comp);
   ccn_name_from_uri (comp, ccn_charbuf_as_string (idxName));
-  ccn_charbuf_append(templ, comp->buf + 1, comp->length - 2);
-  gst_ccnx_utils_append_exclude_any (templ);
+  ccn_charbuf_append(intBuff, comp->buf + 1, comp->length - 2);
+  gst_ccnx_utils_append_exclude_any (intBuff);
   ccn_charbuf_destroy (&comp);
   ccn_charbuf_destroy (&idxName);
-  ccn_charbuf_append_closer (templ);
+  ccn_charbuf_append_closer (intBuff);
   /* </Exclude>           */
 
   /* <ChildSelector>      */
-  ccnb_tagged_putf(templ, CCN_DTAG_ChildSelector, "1");
+  ccnb_tagged_putf(intBuff, CCN_DTAG_ChildSelector, "1");
   /* </ChildSelector>     */
 
   /* <AnswerOriginKind>   */
-  ccn_charbuf_append_tt(templ, CCN_DTAG_AnswerOriginKind, CCN_DTAG);
-  ccnb_append_number(templ, 0);
-  ccn_charbuf_append_closer(templ);
+  ccn_charbuf_append_tt(intBuff, CCN_DTAG_AnswerOriginKind, CCN_DTAG);
+  ccnb_append_number(intBuff, 0);
+  ccn_charbuf_append_closer(intBuff);
   /* </AnswerOriginKind>  */
 
-  ccn_charbuf_append_closer (templ);
+  ccn_charbuf_append_closer (intBuff);
   /* </Interest>          */
 
   /* prepare return bufferes */
-  retBuffer = ccn_charbuf_create ();
-  pcoBuffer = (ContentObject *) malloc (sizeof (ContentObject));
+  retBuff = ccn_charbuf_create ();
+  pcoBuff = (ContentObject *) malloc (sizeof (ContentObject));
 
   while (TRUE) {
     /* FIXME: daddy, i want the candy, or i'll never give up asking */
-    r = ccn_get (obj->mCCNx, obj->mNameFrames, templ, GST_CCNX_CCN_GET_TIMEOUT,
-                 retBuffer, pcoBuffer, NULL, 0);
+    r = ccn_get (obj->mCCNx, obj->mNameFrames, intBuff, GST_CCNX_CCN_GET_TIMEOUT,
+                 retBuff, pcoBuff, NULL, 0);
     if (r >= 0)
       break;
   }
 
   /* get the real index returned with content */
-  retName = gst_ccnx_utils_get_content_name (retBuffer->buf, pcoBuffer);
+  retName = gst_ccnx_utils_get_content_name (retBuff->buf, pcoBuff);
   idxName = gst_ccnx_utils_get_last_comp_from_name (retName);
 
   /* get the content of this packet as segNum */
-  contentBuffer = gst_ccnx_utils_get_content (retBuffer->buf, pcoBuffer);
-  if (contentBuffer != NULL && contentBuffer->length > 0) {
-    segNum = strtoul (ccn_charbuf_as_string (contentBuffer), NULL, 10);
+  conBuff = gst_ccnx_utils_get_content (retBuff->buf, pcoBuff);
+  if (conBuff != NULL && conBuff->length > 0) {
+    segNum = strtoul (ccn_charbuf_as_string (conBuff), NULL, 10);
   }
 
-  ccn_charbuf_destroy (&templ);
+  ccn_charbuf_destroy (&intBuff);
   ccn_charbuf_destroy (&retName);
   ccn_charbuf_destroy (&idxName);
-  ccn_charbuf_destroy (&retBuffer);
-  ccn_charbuf_destroy (&contentBuffer);
-  if (pcoBuffer != NULL)
-    free (pcoBuffer);
+  ccn_charbuf_destroy (&retBuff);
+  ccn_charbuf_destroy (&conBuff);
+  if (pcoBuff != NULL)
+    free (pcoBuff);
   return 0;
 }
 
@@ -222,6 +229,36 @@ gst_ccnx_depkt_check_duration (GstCCNxDepacketizer *obj)
 {
   // TODO
   return FALSE;
+}
+
+static struct ccn_charbuf* gst_ccnx_depkt_get_duration (
+    GstCCNxDepacketizer *obj, struct ccn_charbuf *intBuff)
+{
+  gdouble tStart, tEnd;
+  struct ccn_charbuf *resBuff;
+  struct ccn_charbuf *conName;
+  struct ccn_charbuf *idxName;
+  ContentObject *pcoBuff = NULL;
+  
+  gst_ccnx_utils_get_current_time (&tStart);
+  /* prepare return values */
+  resBuff = ccn_charbuf_create ();
+  pcoBuff = (ContentObject *) malloc (sizeof(ContentObject));
+  ccn_get (obj->mCCNx, obj->mNameFrames, intBuff, GST_CCNX_CCN_GET_TIMEOUT,
+           resBuff, pcoBuff, NULL, 0);
+  gst_ccnx_utils_get_current_time (&tEnd);
+
+  if (resBuff == NULL)
+    return NULL;
+
+  /* get the real index returned with content */
+  conName = gst_ccnx_utils_get_content_name (resBuff->buf, pcoBuff);
+  idxName = gst_ccnx_utils_get_last_comp_from_name (conName);
+
+  ccn_charbuf_destroy (&resBuff);  
+  ccn_charbuf_destroy (&conName);
+
+  return idxName;
 }
 
 static void*
@@ -267,7 +304,6 @@ gst_ccnx_depkt_duration_result (
 
   GstCCNxDepacketizer *obj = (GstCCNxDepacketizer *) selfp->data;
   struct ccn_charbuf *name;
-  size_t last;
 
   if (kind == CCN_UPCALL_FINAL)
     return CCN_UPCALL_RESULT_OK;
@@ -296,7 +332,7 @@ gst_ccnx_depkt_express_interest (GstCCNxDepacketizer *obj, gint64 seg)
 {
   struct ccn_charbuf *name = NULL;
   struct ccn_charbuf *segName = NULL;
-  struct ccn_charbuf *templ = NULL;
+  struct ccn_charbuf *intBuff = NULL;
   struct ccn_closure *callback = NULL;
 
   char *key = NULL;
@@ -314,13 +350,13 @@ gst_ccnx_depkt_express_interest (GstCCNxDepacketizer *obj, gint64 seg)
   key = strdup (ccn_charbuf_as_string (segName));
   g_hash_table_insert (obj->mRetryTable, key, entry);
 
-  templ = ccn_charbuf_create ();
+  intBuff = ccn_charbuf_create ();
   /* <Interest>           */
-  ccn_charbuf_append_tt (templ, CCN_DTAG_Interest, CCN_DTAG);
+  ccn_charbuf_append_tt (intBuff, CCN_DTAG_Interest, CCN_DTAG);
 
   /* <Name>               */
-  ccn_charbuf_append_tt (templ, CCN_DTAG_Name, CCN_DTAG);
-  ccn_charbuf_append_closer (templ);
+  ccn_charbuf_append_tt (intBuff, CCN_DTAG_Name, CCN_DTAG);
+  ccn_charbuf_append_closer (intBuff);
   /* </Name>              */
 
   /* <Lifetime>           */
@@ -329,20 +365,20 @@ gst_ccnx_depkt_express_interest (GstCCNxDepacketizer *obj, gint64 seg)
   int i;
   for (i = sizeof(buf) - 1; i >= 0; i--, lifetime_l12 >>= 8)
     buf[i] = lifetime_l12 & 0xff;
-  ccnb_append_tagged_blob (templ, CCN_DTAG_InterestLifetime, buf, sizeof(buf));
+  ccnb_append_tagged_blob (intBuff, CCN_DTAG_InterestLifetime, buf, sizeof(buf));
   /* </Lifetime>          */
 
-  ccn_charbuf_append_closer (templ);
+  ccn_charbuf_append_closer (intBuff);
   /* </Interest>          */
 
   callback = (struct ccn_closure*) calloc (1, sizeof(struct ccn_closure));
   callback->data = obj;
   callback->p = &gst_ccnx_depkt_upcall;
-  ccn_express_interest (obj->mCCNx, name, callback, templ);
+  ccn_express_interest (obj->mCCNx, name, callback, intBuff);
 
   ccn_charbuf_destroy (&name);
   ccn_charbuf_destroy (&segName);
-  ccn_charbuf_destroy (&templ);
+  ccn_charbuf_destroy (&intBuff);
 
   return TRUE;
 }
@@ -397,6 +433,16 @@ gst_ccnx_depkt_upcall (struct ccn_closure *selfp,
                        enum ccn_upcall_kind kind,
                        struct ccn_upcall_info *info)
 {
+  struct ccn_charbuf *intName = NULL;    /* interest name */
+  struct ccn_charbuf *conName = NULL;    /* content name */
+  /* segName and segStr are used to look up as key in mRetryTable */
+  struct ccn_charbuf *segName = NULL;
+  struct ccn_charbuf *content = NULL;
+  char *segStr = NULL;
+  gdouble now, rtt, diff, absdiff;
+  GstCCNxRetryEntry *entry = NULL;
+  GstCCNxRetryEntry *new_entry = NULL;  
+
   GstCCNxDepacketizer *depkt = (GstCCNxDepacketizer *) selfp->data;
 
   if (depkt->mRunning) {
@@ -406,16 +452,6 @@ gst_ccnx_depkt_upcall (struct ccn_closure *selfp,
     return CCN_UPCALL_RESULT_OK;
   }
   else if (kind == CCN_UPCALL_CONTENT) {
-    struct ccn_charbuf *intName = NULL;    /* interest name */
-    struct ccn_charbuf *conName = NULL;    /* content name */
-    /* segName and segStr are used to look up as key in mRetryTable */
-    struct ccn_charbuf *segName = NULL;
-    struct ccn_charbuf *content = NULL;
-
-    char *segStr = NULL;
-    gdouble now, rtt, diff, absdiff;
-    GstCCNxRetryEntry *entry = NULL;
-
     intName = gst_ccnx_utils_get_interest_name (info->interest_ccnb, info->pi);
     segName = gst_ccnx_utils_get_last_comp_from_name (intName);
     segStr = ccn_charbuf_as_string (segName);
@@ -435,9 +471,10 @@ gst_ccnx_depkt_upcall (struct ccn_closure *selfp,
     absdiff = (diff > 0) ? diff : -diff;
     depkt->mSRtt += 1 / 128.0 * diff;
     depkt->mRttVar += 1 / 64.0 * (absdiff - depkt->mRttVar);
-    depkt->mInterestLifetime = depkt->mSRtt + 3 * sqrt (depkt->mRttVar);
+    depkt->mInterestLifetime = 
+        int (4096 * (depkt->mSRtt + 3 * sqrt (depkt->mRttVar)));
 
-    g_hash_table_remove (depkt->mRetryTable, segStr);
+    g_hash_table_remove (depkt->mRetryTable, segStr) ;
     free (segStr);
 
     /* now we buffer the content */
@@ -448,11 +485,38 @@ gst_ccnx_depkt_upcall (struct ccn_closure *selfp,
     gst_ccnx_fb_put (
         depkt->mFetchBuffer, gst_ccnx_depkt_seg2num (segName), content);
 
-    // TODO
     return CCN_UPCALL_RESULT_OK;
   }
   else if (kind == CCN_UPCALL_INTEREST_TIMED_OUT) {
-    // TOOD
+    intName = gst_ccnx_utils_get_interest_name (info->interest_ccnb, info->pi);
+    segName = gst_ccnx_utils_get_last_comp_from_name (intName);
+    segStr = ccn_charbuf_as_string (segName);
+    ccn_charbuf_destroy (&intName);
+    ccn_charbuf_destroy (&segName);
+
+    /* 
+     * the definition about InterestLifetime is different with Derek's, here we
+     * use 1/4096 sec, while Derek is using second directly.
+     */
+    depkt->mInterestLifetime = 2 * 4096;
+
+    entry = (GstCCNxRetryEntry*) g_hash_table_lookup (
+        depkt->mRetryTable, segStr);
+
+    if (entry->mRetryCnt > 0) {
+      depkt->mStatsRetries++;
+      gst_ccnx_utils_get_current_time (&now);
+      new_entry = (GstCCNxRetryEntry *) malloc (sizeof(GstCCNxRetryEntry));
+      new_entry->mRetryCnt = entry->mRetryCnt;
+      new_entry->mTimeVal = now;
+      g_hash_table_replace (depkt->mRetryTable, segStr, new_entry);
+      return CCN_UPCALL_RESULT_REEXPRESS;
+    }
+
+    depkt->mStatsDrops++;
+    g_hash_table_remove (depkt->mRetryTable, segStr);
+    gst_ccnx_fb_timeout (depkt->mFetchBuffer, gst_ccnx_depkt_seg2num (segName));
+
     return CCN_UPCALL_RESULT_OK;
   }
   else if (kind == CCN_UPCALL_CONTENT_UNVERIFIED) {
@@ -563,6 +627,8 @@ gst_ccnx_depkt_create (
 
   obj->mSRtt = 0.05;
   obj->mRttVar = 0.01;
+  obj->mStatsRetries = 0;
+  obj->mStatsDrops = 0;
 
   return obj;
 }
@@ -632,6 +698,47 @@ gst_ccnx_depkt_stop (GstCCNxDepacketizer *obj)
 gboolean
 gst_ccnx_depkt_init_duration (GstCCNxDepacketizer *obj)
 {
+  struct ccn_charbuf *intBuff = NULL;
+  struct ccn_charbuf *comp = NULL;
+
+  intBuff = ccn_charbuf_create ();
+  /* <Interest>           */
+  ccn_charbuf_append_tt (intBuff, CCN_DTAG_Interest, CCN_DTAG);
+
+  /* <Name>               */
+  ccn_charbuf_append_tt (intBuff, CCN_DTAG_Name, CCN_DTAG);
+  ccn_charbuf_append_closer (intBuff);
+  /* </Name>              */
+
+  /* <Exclude>            */
+  ccn_charbuf_append_tt (intBuff, CCN_DTAG_Exclude, CCN_DTAG);
+  comp = ccn_charbuf_create ();
+  ccn_name_init (comp);
+  //  ccn_name_from_uri (comp, ccn_charbuf_as_string(index));
+  //  ccn_charbuf_append(intBuff, comp->buf + 1, comp->length - 2);
+  //  gst_ccnx_utils_append_exclude_any (intBuff);
+  ccn_charbuf_append_closer (intBuff);
+  /* </Exclude>           */
+
+  /* <ChildSelector>      */
+  ccnb_tagged_putf(intBuff, CCN_DTAG_ChildSelector, "1");
+  /* </ChildSelector>     */
+
+  /* <AnswerOriginKind>   */
+  ccn_charbuf_append_tt(intBuff, CCN_DTAG_AnswerOriginKind, CCN_DTAG);
+  ccnb_append_number(intBuff, CCN_AOK_DEFAULT);
+  ccn_charbuf_append_closer(intBuff);
+  /* </AnswerOriginKind>  */
+
+  ccn_charbuf_append_closer (intBuff);
+  /* </Interest>          */
+
+  while (TRUE) {
+    /* TODO when have to design a better method to prepare these interests */
+    /* maybe excl list ? */
+    
+  }
+
   // TODO
   return FALSE;
 }

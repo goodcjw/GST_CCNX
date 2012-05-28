@@ -22,7 +22,6 @@ extern "C" {
 }
 #include "gstCCNxFetchBuffer.h"
 
-static void gst_ccnx_fb_timeout (GstCCNxFetchBuffer* object, gint64 num);
 static gint64 gst_ccnx_fb_get_size (GstCCNxFetchBuffer* object);
 static void gst_ccnx_fb_request_data (GstCCNxFetchBuffer* object);
 static void gst_ccnx_fb_push_data (GstCCNxFetchBuffer* object);
@@ -55,7 +54,7 @@ gst_ccnx_fb_put (GstCCNxFetchBuffer* object, gint64 num,
   gst_ccnx_fb_push_data (object);
 }
 
-static void
+void
 gst_ccnx_fb_timeout (GstCCNxFetchBuffer* object, gint64 num)
 {
   gst_ccnx_fb_put (object, num, NULL);

@@ -57,7 +57,9 @@ GstCCNxFetchBuffer * gst_ccnx_fb_create (
 
 void gst_ccnx_fb_destroy (GstCCNxFetchBuffer ** object);
 void gst_ccnx_fb_reset (GstCCNxFetchBuffer *object, gint64 position);
-void gst_ccnx_fb_put (
-    GstCCNxFetchBuffer* object, gint64 num, struct ccn_charbuf *buf);
+void gst_ccnx_fb_put (GstCCNxFetchBuffer* object, 
+                      gint64 num, struct ccn_charbuf *buf);
+void gst_ccnx_fb_timeout (GstCCNxFetchBuffer* object, gint64 num);
+
 
 #endif // __GST_CCNX_FETCH_BUFFER_H__

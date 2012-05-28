@@ -29,6 +29,8 @@ extern "C" {
 }
 #include "gstCCNxUtils.h"
 
+static int name_compare (const void *a, const void *b);
+
 gint32
 gst_ccnx_utils_hexit (int c)
 {
@@ -141,7 +143,6 @@ gst_ccnx_utils_get_interest_name (
 {
   size_t start = pi->offset[CCN_PI_B_Name];
   size_t end = pi->offset[CCN_PI_E_Name];
-  fprintf (stdout, "get_insterest_name: tmpNameSize: %d\n", end - start);
   struct ccn_charbuf *tmpName = ccn_charbuf_create ();
   ccn_uri_append (tmpName, &content[start], end - start, 1);
   return tmpName;
@@ -152,7 +153,6 @@ gst_ccnx_utils_get_content_name (const unsigned char *content, ContentObject *pc
 {
   size_t start = pco->offset[CCN_PCO_B_Name];
   size_t end = pco->offset[CCN_PCO_E_Name];
-  fprintf (stdout, "get_content_name: tmpNameSize: %d\n", end - start);
   struct ccn_charbuf *tmpName = ccn_charbuf_create ();
   ccn_uri_append (tmpName, &content[start], end - start, 1);
   return tmpName;
@@ -170,8 +170,123 @@ gst_ccnx_utils_get_last_comp_from_name (const struct ccn_charbuf *name)
 }
 
 void
-gst_ccnx_utils_get_current_time (gdouble *now) {
+gst_ccnx_utils_get_current_time (gdouble *now)
+{
   GTimeVal nowVal;
   g_get_current_time (&nowVal);
   *now = nowVal.tv_sec + (gdouble) nowVal.tv_usec / 1000000;
+}
+
+struct ccn_charbuf *
+gst_ccnx_utils_interest_prepare (GstCCNxInterestTempl * templ)
+{
+  struct ccn_charbuf *intBuff = NULL;
+  const struct ccn_charbuf *comp = NULL;
+  guint32 lifetime_l12;
+  size_t i;
+
+  intBuff = ccn_charbuf_create ();
+  /* <Interest>           */
+  ccn_charbuf_append_tt (intBuff, CCN_DTAG_Interest, CCN_DTAG);
+
+  /* <Name>               */
+  ccn_charbuf_append_tt (intBuff, CCN_DTAG_Name, CCN_DTAG);
+  ccn_charbuf_append_closer (intBuff);
+  /* </Name>              */
+
+  if (templ->mExclList != NULL) {
+    /* <Exclude>            */
+    ccn_charbuf_append_tt (intBuff, CCN_DTAG_Exclude, CCN_DTAG);
+    /* exclude lower side interests */
+    if (templ->mExclLow)
+      gst_ccnx_utils_append_exclude_any (intBuff);
+    /* write down all names listed in the mExclList */
+    for (i = 0; i < templ->mExclNum; i++) {
+      comp = templ->mExclList[i];
+      if (comp != NULL)
+        ccn_charbuf_append (intBuff, comp->buf + 1, comp->length - 2);
+    }
+    /* exclude higher side interests */
+    if (templ->mExclHigh)
+      gst_ccnx_utils_append_exclude_any (intBuff);
+    ccn_charbuf_append_closer (intBuff);
+    /* </Exclude>           */
+  }
+
+  if (templ->mChildRight) {
+    /* <ChildSelector>      */
+    ccnb_tagged_putf(intBuff, CCN_DTAG_ChildSelector, "1");
+    /* </ChildSelector>     */
+  }
+
+  /* <AnswerOriginKind>   */
+  ccn_charbuf_append_tt(intBuff, CCN_DTAG_AnswerOriginKind, CCN_DTAG);
+  ccnb_append_number(intBuff, templ->mAOK);
+  ccn_charbuf_append_closer(intBuff);
+  /* </AnswerOriginKind>  */
+
+  if (templ->mLifetime > 0) {
+    /* <Lifetime>           */
+    unsigned char buf[3] = { 0 };
+    lifetime_l12 = templ->mLifetime;
+    for (i = sizeof(buf) - 1; i >= 0; i--, lifetime_l12 >>= 8)
+      buf[i] = lifetime_l12 & 0xff;
+    ccnb_append_tagged_blob (intBuff, CCN_DTAG_InterestLifetime, buf, sizeof(buf));
+    /* </Lifetime>          */
+  }
+  ccn_charbuf_append_closer (intBuff);
+  /* </Interest>          */
+  return intBuff;
+}
+
+void
+gst_ccnx_utils_interest_destroy (GstCCNxInterestTempl **obj)
+{
+  size_t i;
+  GstCCNxInterestTempl *templ = *obj;
+
+  if (templ != NULL) {
+    /* destroy the exclusion list and charbuf inside it */
+    if (templ->mExclList != NULL) {
+      for (i = 0; i < templ->mExclNum; i++)
+        ccn_charbuf_destroy (&templ->mExclList[i]);
+      free (templ->mExclList);
+    } 
+    /* destroy the object itself */
+    free (templ);
+    *obj = NULL;
+  }
+}
+
+void
+gst_ccnx_utils_interest_exclude_comp (
+    GstCCNxInterestTempl *templ, struct ccn_charbuf *comp)
+{
+  if (templ->mExclList == NULL) {
+    templ->mExclList = (struct ccn_charbuf **) calloc (
+        GST_CCNX_DEFAULT_EXCL_LIST_CAP, sizeof (struct ccn_charbuf*));
+    templ->mExclCap = GST_CCNX_DEFAULT_EXCL_LIST_CAP;
+  }
+
+  if (templ->mExclNum == templ->mExclCap) {
+    templ->mExclCap *= 2;
+    templ->mExclList = 
+        (struct ccn_charbuf **) realloc (templ->mExclList, templ->mExclCap);
+  }
+
+  /* insert the comp into the exclusion list */
+  templ->mExclList[templ->mExclNum++] = comp;
+
+  /* sort the exclusion list, necessary for CCNx */
+  qsort (templ->mExclList, templ->mExclNum, 
+         sizeof (struct ccn_charbuf *), name_compare);
+}
+
+static int /* for qsort */
+name_compare (const void *a, const void *b)
+{
+  const struct ccn_charbuf *aa = *(const struct ccn_charbuf **)a;
+  const struct ccn_charbuf *bb = *(const struct ccn_charbuf **)b;
+  int ans = ccn_compare_names(aa->buf, aa->length, bb->buf, bb->length);
+  return ans;
 }
