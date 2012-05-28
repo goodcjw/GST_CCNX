@@ -20,11 +20,11 @@
 #ifndef __GST_CCNX_DEPACKETIZER_H__
 #define __GST_CCNX_DEPACKETIZER_H__
 
-#include <pthread.h>
-
 extern "C" {
 #include <ccn/ccn.h>
 }
+
+#include <pthread.h>
 #include <gst/gst.h>
 
 #include "gstCCNxFetchBuffer.h"
@@ -61,7 +61,7 @@ struct _GstCCNxCmdsQueueEntry {
 
 struct _GstCCNxRetryEntry {
   gint32                         mRetryCnt;
-  GTimeVal                       mTimeVal;
+  gdouble                        mTimeVal;
 };
 
 struct _GstCCNxDepacketizer {
@@ -94,7 +94,8 @@ struct _GstCCNxDepacketizer {
   GstCCNxFetchBuffer            *mFetchBuffer;
   GstCCNxSegmenter              *mSegmenter;
 
-  /* self._stats = { 'srtt': 0.05, 'rttvar': 0.01 } */
+  gdouble                        mSRtt;
+  gdouble                        mRttVar;
   gint32                         mStatsRetries;
   gint32                         mStatsDrops;
 

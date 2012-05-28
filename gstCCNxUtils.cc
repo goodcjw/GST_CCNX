@@ -168,3 +168,10 @@ gst_ccnx_utils_get_last_comp_from_name (const struct ccn_charbuf *name)
   ccn_charbuf_append (tmpLast, &name->buf[last], name->length - last);
   return tmpLast;
 }
+
+void
+gst_ccnx_utils_get_current_time (gdouble *now) {
+  GTimeVal nowVal;
+  g_get_current_time (&nowVal);
+  *now = nowVal.tv_sec + (gdouble) nowVal.tv_usec / 1000000;
+}

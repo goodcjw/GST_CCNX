@@ -58,5 +58,6 @@ struct ccn_charbuf *gst_ccnx_utils_get_interest_name (
 struct ccn_charbuf * 
 gst_ccnx_utils_get_last_comp_from_name (const struct ccn_charbuf *name);
 
+void gst_ccnx_utils_get_current_time (gdouble *now);
 
 #endif // __GST_CCNX_UTILS_H__

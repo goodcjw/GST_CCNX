@@ -309,7 +309,7 @@ gst_ccnx_depkt_express_interest (GstCCNxDepacketizer *obj, gint64 seg)
   ccn_name_from_uri (name, ccn_charbuf_as_string (segName));
 
   entry->mRetryCnt = obj->mRetryCnt;
-  g_get_current_time (&entry->mTimeVal);
+  gst_ccnx_utils_get_current_time (&entry->mTimeVal);
   key = strdup (ccn_charbuf_as_string (segName));
   g_hash_table_insert (obj->mRetryTable, key, entry);
 
@@ -406,9 +406,16 @@ gst_ccnx_depkt_upcall (struct ccn_closure *selfp,
     return CCN_UPCALL_RESULT_OK;
   }
   else if (kind == CCN_UPCALL_CONTENT) {
-    char *key = NULL;
-    struct ccn_charbuf *interestName = 
-        gst_ccnx_utils_get_interest_name (info->interest_ccnb, info->pi);
+    struct ccn_charbuf *intName = NULL;
+    /* segName and segStr are used to look up as key in mRetryTable */
+    struct ccn_charbuf *segName = NULL;
+    char *segStr = NULL;
+    GTimeVal nRtt;
+    
+    intName = gst_ccnx_utils_get_interest_name (info->interest_ccnb, info->pi);
+    segName = gst_ccnx_utils_get_last_comp_from_name (intName);
+    segStr = ccn_charbuf_as_string (segName);
+
     
 
     // TODO
@@ -523,6 +530,9 @@ gst_ccnx_depkt_create (
 
   obj->mRetryTable = 
       g_hash_table_new_full (g_str_hash, g_str_equal, free, free);
+
+  obj->mSRtt = 0.05;
+  obj->mRttVar = 0.01;
 
   return obj;
 }
