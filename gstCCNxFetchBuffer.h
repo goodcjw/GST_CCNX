@@ -34,13 +34,13 @@ typedef struct _GstCCNxFetchBuffer GstCCNxFetchBuffer;
 typedef gboolean (*gst_ccnx_fb_request_cb) (
     GstCCNxDepacketizer *object, gint64 seg);
 typedef void (*gst_ccnx_fb_response_cb) (
-    GstCCNxDepacketizer *object, struct ccn_charbuf *buf, ContentObject *data);
+    GstCCNxDepacketizer *object, struct ccn_charbuf *buf);
 
 typedef struct _GstCCNxFBEntry GstCCNxFBEntry;
 
 struct _GstCCNxFBEntry {
-  struct ccn_charbuf * buf;
-  ContentObject * pco;
+  struct ccn_charbuf                    *mBuf;
+  ContentObject                         *mPco;
 };
 
 struct _GstCCNxFetchBuffer {
@@ -64,5 +64,7 @@ GstCCNxFetchBuffer * gst_ccnx_fb_create (
 
 void gst_ccnx_fb_destroy (GstCCNxFetchBuffer ** object);
 void gst_ccnx_fb_reset (GstCCNxFetchBuffer *object, gint64 position);
+void gst_ccnx_fb_put (GstCCNxFetchBuffer* object, gint64 num,
+                      struct ccn_charbuf *buf, ContentObject * pco);
 
 #endif // __GST_CCNX_FETCH_BUFFER_H__

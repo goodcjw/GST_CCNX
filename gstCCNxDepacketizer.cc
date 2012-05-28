@@ -17,6 +17,7 @@
  * Boston, MA 02111-1307, USA.
  */
 
+#include <math.h>
 #include <string.h>
 
 extern "C" {
@@ -50,7 +51,7 @@ static enum ccn_upcall_res gst_ccnx_depkt_duration_result (
 static gboolean gst_ccnx_depkt_express_interest (
     GstCCNxDepacketizer *obj, gint64 seg);
 static void gst_ccnx_depkt_process_response (
-    GstCCNxDepacketizer *obj, struct ccn_charbuf *buf, ContentObject*pco);
+    GstCCNxDepacketizer *obj, struct ccn_charbuf *buf);
 static void gst_ccnx_depkt_push_data (
     GstCCNxDepacketizer *obj, GstBuffer *buf);
 
@@ -348,17 +349,16 @@ gst_ccnx_depkt_express_interest (GstCCNxDepacketizer *obj, gint64 seg)
 
 static void
 gst_ccnx_depkt_process_response (
-    GstCCNxDepacketizer *obj, struct ccn_charbuf *buf, ContentObject *pco)
+    GstCCNxDepacketizer *obj, struct ccn_charbuf *content)
 {
-  /* when this function returns, buf and pco will be released immediately */
-  struct ccn_charbuf *content;
-  if (pco == NULL) {
+  /* when this function returns, content will be released immediately */
+  if (content == NULL) {
     gst_ccnx_segmenter_pkt_lost (obj->mSegmenter);
     return;
   }
-  content = gst_ccnx_utils_get_content (buf->buf, pco);
   // now we get the content, we don't need buf and pco anymore,
   // content as a ccn_charbuf will be freed in segmenter's queue management.
+  // FIXME content might be released...
   gst_ccnx_segmenter_process_pkt (obj->mSegmenter, content);
 }
 
@@ -406,17 +406,47 @@ gst_ccnx_depkt_upcall (struct ccn_closure *selfp,
     return CCN_UPCALL_RESULT_OK;
   }
   else if (kind == CCN_UPCALL_CONTENT) {
-    struct ccn_charbuf *intName = NULL;
+    struct ccn_charbuf *intName = NULL;    /* interest name */
+    struct ccn_charbuf *conName = NULL;    /* content name */
     /* segName and segStr are used to look up as key in mRetryTable */
     struct ccn_charbuf *segName = NULL;
+    struct ccn_charbuf *content = NULL;
+
     char *segStr = NULL;
-    GTimeVal nRtt;
-    
+    gdouble now, rtt, diff, absdiff;
+    GstCCNxRetryEntry *entry = NULL;
+
     intName = gst_ccnx_utils_get_interest_name (info->interest_ccnb, info->pi);
     segName = gst_ccnx_utils_get_last_comp_from_name (intName);
     segStr = ccn_charbuf_as_string (segName);
+    ccn_charbuf_destroy (&intName);
+    ccn_charbuf_destroy (&segName);
 
-    
+    /* lookup the sending time */
+    entry = (GstCCNxRetryEntry*) g_hash_table_lookup (
+        depkt->mRetryTable, segStr);
+
+    if (entry == NULL)
+      return CCN_UPCALL_RESULT_ERR;  /* this should never happen */
+
+    gst_ccnx_utils_get_current_time (&now);
+    rtt = now - entry->mTimeVal;
+    diff = rtt - depkt->mSRtt;
+    absdiff = (diff > 0) ? diff : -diff;
+    depkt->mSRtt += 1 / 128.0 * diff;
+    depkt->mRttVar += 1 / 64.0 * (absdiff - depkt->mRttVar);
+    depkt->mInterestLifetime = depkt->mSRtt + 3 * sqrt (depkt->mRttVar);
+
+    g_hash_table_remove (depkt->mRetryTable, segStr);
+    free (segStr);
+
+    /* now we buffer the content */
+    conName = gst_ccnx_utils_get_interest_name (info->interest_ccnb, info->pi);
+    segName = gst_ccnx_utils_get_last_comp_from_name (conName);
+
+    content = gst_ccnx_utils_get_content (info->content_ccnb, info->pco);
+    gst_ccnx_fb_put (depkt->mFetchBuffer, gst_ccnx_depkt_seg2num (segName),
+                     content, info->pco);
 
     // TODO
     return CCN_UPCALL_RESULT_OK;
