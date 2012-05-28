@@ -135,13 +135,26 @@ gst_ccnx_utils_append_exclude_any (struct ccn_charbuf *c)
   }
 }
 
-struct ccn_charbuf * 
-gst_ccnx_utils_get_name (const unsigned char *content, ContentObject *pco)
+struct ccn_charbuf *
+gst_ccnx_utils_get_interest_name (
+    const unsigned char *content, struct ccn_parsed_interest *pi)
 {
-  size_t tmpBufferSize = pco->offset[CCN_PCO_B_Name] -
-      pco->offset[CCN_PCO_E_Name];
+  size_t start = pi->offset[CCN_PI_B_Name];
+  size_t end = pi->offset[CCN_PI_E_Name];
+  fprintf (stdout, "get_insterest_name: tmpNameSize: %d\n", end - start);
   struct ccn_charbuf *tmpName = ccn_charbuf_create ();
-  ccn_uri_append (tmpName, content, tmpBufferSize, 1);
+  ccn_uri_append (tmpName, &content[start], end - start, 1);
+  return tmpName;
+}
+
+struct ccn_charbuf * 
+gst_ccnx_utils_get_content_name (const unsigned char *content, ContentObject *pco)
+{
+  size_t start = pco->offset[CCN_PCO_B_Name];
+  size_t end = pco->offset[CCN_PCO_E_Name];
+  fprintf (stdout, "get_content_name: tmpNameSize: %d\n", end - start);
+  struct ccn_charbuf *tmpName = ccn_charbuf_create ();
+  ccn_uri_append (tmpName, &content[start], end - start, 1);
   return tmpName;
 }
 

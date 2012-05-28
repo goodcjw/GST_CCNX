@@ -182,7 +182,7 @@ gst_ccnx_depkt_fetch_seek_query (GstCCNxDepacketizer *obj, guint64 *idxNum)
   }
 
   /* get the real index returned with content */
-  retName = gst_ccnx_utils_get_name (retBuffer->buf, pcoBuffer);
+  retName = gst_ccnx_utils_get_content_name (retBuffer->buf, pcoBuffer);
   idxName = gst_ccnx_utils_get_last_comp_from_name (retName);
 
   /* get the content of this packet as segNum */
@@ -277,7 +277,7 @@ gst_ccnx_depkt_duration_result (
 
   if (kind == CCN_UPCALL_CONTENT) {
     /* get the name of returned content and store its last component */
-    name = gst_ccnx_utils_get_name (info->content_ccnb, info->pco);
+    name = gst_ccnx_utils_get_content_name (info->content_ccnb, info->pco);
     obj->mDurationLast = gst_ccnx_utils_get_last_comp_from_name (name);
     ccn_charbuf_destroy (&name);
   }
@@ -407,7 +407,8 @@ gst_ccnx_depkt_upcall (struct ccn_closure *selfp,
   }
   else if (kind == CCN_UPCALL_CONTENT) {
     char *key = NULL;
-
+    struct ccn_charbuf *interestName = 
+        gst_ccnx_utils_get_interest_name (info->interest_ccnb, info->pi);
     
 
     // TODO
