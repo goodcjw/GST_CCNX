@@ -45,16 +45,12 @@ gst_ccnx_fb_reset (GstCCNxFetchBuffer* object, gint64 position)
  */
 void
 gst_ccnx_fb_put (GstCCNxFetchBuffer* object, gint64 num,
-                 struct ccn_charbuf *buf, ContentObject * pco)
+                 struct ccn_charbuf *buf)
 {
   if (num >= object->mPosition) {
     gint64 * p_num = (gint64 *) malloc (sizeof(gint64));
-    GstCCNxFBEntry * p_entry = 
-        (GstCCNxFBEntry *) malloc (sizeof(GstCCNxFBEntry));
     *p_num = num;
-    p_entry->mBuf = buf;
-    p_entry->mPco = pco;
-    g_hash_table_insert (object->mBuffer, p_num, p_entry);
+    g_hash_table_insert (object->mBuffer, p_num, buf);
   }
   gst_ccnx_fb_push_data (object);
 }
@@ -62,7 +58,7 @@ gst_ccnx_fb_put (GstCCNxFetchBuffer* object, gint64 num,
 static void
 gst_ccnx_fb_timeout (GstCCNxFetchBuffer* object, gint64 num)
 {
-  gst_ccnx_fb_put (object, num, NULL, NULL);
+  gst_ccnx_fb_put (object, num, NULL);
 }
 
 static gint64
@@ -99,13 +95,14 @@ gst_ccnx_fb_request_data (GstCCNxFetchBuffer* object)
 static void
 gst_ccnx_fb_push_data (GstCCNxFetchBuffer* object)
 {
-  GstCCNxFBEntry * entry;
+  struct ccn_charbuf *entry;
   while (g_hash_table_size (object->mBuffer) != 0) {
-    entry = (GstCCNxFBEntry *) g_hash_table_lookup (
+    entry = (struct ccn_charbuf *) g_hash_table_lookup (
         object->mBuffer, &object->mPosition);
+
     /* call the callback function in GstCCNxDepacketizer */
-    object->mResponser (object->mDepkt, entry->mBuf);
-    /* buf and pco will be release at this point */
+    object->mResponser (object->mDepkt, entry);
+    /* buf will be release at this point */
     g_hash_table_remove (object->mBuffer, &object->mPosition);
     object->mPosition += 1;
   }
@@ -154,13 +151,6 @@ gst_ccnx_fb_destroy (GstCCNxFetchBuffer ** object)
 static void
 gst_ccnx_fb_entry_destroy (void *obj)
 {
-  GstCCNxFBEntry * entry = * (GstCCNxFBEntry**) obj;
-
-  if (entry != NULL) {
-    /* FIXME shall we destroy these values here ? */
-    if (entry->mBuf != NULL)
-      free (entry->mBuf);
-    if (entry->mPco != NULL)
-      free (entry->mPco);
-  }
+  struct ccn_charbuf * entry = (struct ccn_charbuf *) obj;
+  ccn_charbuf_destroy (&entry);
 }

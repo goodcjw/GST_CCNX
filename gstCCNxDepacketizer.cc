@@ -445,8 +445,8 @@ gst_ccnx_depkt_upcall (struct ccn_closure *selfp,
     segName = gst_ccnx_utils_get_last_comp_from_name (conName);
 
     content = gst_ccnx_utils_get_content (info->content_ccnb, info->pco);
-    gst_ccnx_fb_put (depkt->mFetchBuffer, gst_ccnx_depkt_seg2num (segName),
-                     content, info->pco);
+    gst_ccnx_fb_put (
+        depkt->mFetchBuffer, gst_ccnx_depkt_seg2num (segName), content);
 
     // TODO
     return CCN_UPCALL_RESULT_OK;
